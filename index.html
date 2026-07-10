@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="听音背单词">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>听音背单词</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #f6f7f5;
+      --panel: #ffffff;
+      --ink: #18201d;
+      --muted: #68756f;
+      --line: #dce5e0;
+      --soft: #eef8f5;
+      --soft-blue: #e8f0ff;
+      --primary: #0f766e;
+      --primary-dark: #0b5f59;
+      --warn: #b45309;
+      --warn-bg: #fff3dc;
+      --danger: #b91c1c;
+      --danger-bg: #fee2e2;
+      --radius: 8px;
+      --shadow: 0 18px 46px rgba(23, 32, 28, .08);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--ink);
+      background: linear-gradient(180deg, #e8f7f3 0, var(--bg) 310px);
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    .app {
+      width: min(1120px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 22px 0 34px;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
+    .mark {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #0f766e, #2563eb);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(1.5rem, 1.1rem + 1vw, 2.1rem); line-height: 1.12; }
+    .sub { margin-top: 5px; color: var(--muted); line-height: 1.45; }
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .pill {
+      min-height: 32px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.78);
+      color: var(--muted);
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 11px;
+      font-weight: 700;
+      font-size: .9rem;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(330px, .95fr) minmax(390px, 1.1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 17px 17px 0;
+    }
+    .title { font-size: 1rem; font-weight: 900; }
+    .body { padding: 17px; }
+
+    .tabs {
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid var(--line);
+      background: #eef2ef;
+      border-radius: var(--radius);
+      gap: 3px;
+    }
+    .tab {
+      min-height: 34px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 800;
+      padding: 7px 12px;
+    }
+    .tab[aria-selected="true"] {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(23,32,28,.08);
+    }
+
+    .listen {
+      min-height: 182px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #ddf7f0, #e8f0ff);
+      padding: 18px;
+      margin-bottom: 13px;
+    }
+
+    .bars { height: 56px; display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .bar { width: 10px; height: 30px; border-radius: 999px; background: var(--primary); opacity: .55; transform-origin: bottom; }
+    .speaking .bar:nth-child(1) { animation: pulse .7s ease-in-out infinite; }
+    .speaking .bar:nth-child(2) { animation: pulse .7s .08s ease-in-out infinite; }
+    .speaking .bar:nth-child(3) { animation: pulse .7s .16s ease-in-out infinite; }
+    .speaking .bar:nth-child(4) { animation: pulse .7s .24s ease-in-out infinite; }
+    .speaking .bar:nth-child(5) { animation: pulse .7s .32s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { transform: scaleY(.62); opacity: .45; }
+      50% { transform: scaleY(1.7); opacity: .95; }
+    }
+
+    .listen strong { display: block; font-size: 1.05rem; margin-bottom: 6px; }
+    .listen span { color: var(--muted); line-height: 1.5; }
+
+    .answer {
+      display: none;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 15px;
+      margin-bottom: 13px;
+    }
+    .answer.show { display: block; }
+    .answer-word { font-size: clamp(1.85rem, 1.4rem + 1vw, 2.7rem); font-weight: 900; line-height: 1; overflow-wrap: anywhere; }
+    .ipa {
+      margin-top: 10px;
+      color: var(--primary-dark);
+      font-weight: 900;
+      direction: ltr;
+      unicode-bidi: isolate;
+      font-family: Arial, "Segoe UI", sans-serif;
+    }
+    .meaning { margin-top: 10px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .source { margin-top: 9px; color: var(--muted); font-size: .84rem; line-height: 1.45; }
+
+    .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .btn {
+      min-height: 44px;
+      border-radius: var(--radius);
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .primary { background: var(--primary); color: #fff; }
+    .primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .soft { background: #d9f4ef; color: var(--primary-dark); }
+    .ghost { background: #eef2ef; color: var(--ink); }
+    .warm { background: var(--warn-bg); color: #c2410c; }
+    .danger { background: var(--danger-bg); color: var(--danger); }
+
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label, .field { display: grid; gap: 7px; color: var(--muted); font-weight: 800; font-size: .86rem; }
+    input, textarea, select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+      outline: none;
+    }
+    textarea { min-height: 84px; resize: vertical; line-height: 1.55; }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,118,110,.14); }
+    .lookup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+    .form { display: grid; gap: 12px; margin-bottom: 16px; }
+    .form-actions, .library-tools, .backup {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .hint, .status { color: var(--muted); font-size: .84rem; line-height: 1.45; }
+    .status { min-height: 1.2em; }
+    .status.good { color: var(--primary-dark); }
+    .status.warn { color: var(--warn); }
+    .library-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: 10px; }
+    .backup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: 14px 0 0;
+      display: grid;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+    }
+    .item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 11px;
+    }
+    .word { font-weight: 900; overflow-wrap: anywhere; }
+    .meta {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: .85rem;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
+    .item-actions { display: flex; gap: 6px; }
+    .mini { min-width: 36px; height: 36px; border-radius: var(--radius); background: #eef2ef; color: var(--ink); font-weight: 900; }
+    .empty {
+      min-height: 170px;
+      border: 1px dashed #cbd6d1;
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+      padding: 18px;
+      background: rgba(255,255,255,.6);
+    }
+    .hidden { display: none !important; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%) translateY(18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+      background: #17201c;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-weight: 800;
+      max-width: min(430px, calc(100vw - 28px));
+      text-align: center;
+      z-index: 20;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 870px) {
+      .grid { grid-template-columns: 1fr; }
+      .review { order: -1; }
+      .top { flex-direction: column; }
+      .stats { justify-content: flex-start; }
+    }
+    @media (max-width: 560px) {
+      .app { width: min(100vw - 20px, 1120px); padding-top: 16px; }
+      .head, .body { padding-left: 14px; padding-right: 14px; }
+      .actions, .two, .lookup-row, .library-tools, .backup { grid-template-columns: 1fr; }
+      .btn { width: 100%; }
+      .tabs { width: 100%; }
+      .tab { flex: 1; }
+      .form-actions { display: grid; grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">▶</div>
+        <div>
+          <h1>听音背单词</h1>
+          <p class="sub">自己输入单词，自动查询美音音标和中文意思，再用读音复习。</p>
+        </div>
+      </div>
+      <div class="stats" aria-live="polite">
+        <span class="pill" id="wordCount">0 个单词</span>
+        <span class="pill" id="roundCount">本轮 0 个</span>
+      </div>
+    </header>
+
+    <section class="grid">
+      <section class="panel review">
+        <div class="head">
+          <h2 class="title">复习</h2>
+          <div class="tabs" role="tablist" aria-label="复习顺序">
+            <button class="tab" id="randomMode" type="button" aria-selected="true">随机</button>
+            <button class="tab" id="orderMode" type="button" aria-selected="false">顺序</button>
+          </div>
+        </div>
+        <div class="body">
+          <div class="listen" id="listenBox">
+            <div>
+              <div class="bars" aria-hidden="true">
+                <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              </div>
+              <strong id="listenTitle">暂无单词可播放</strong>
+              <span id="listenText">先在词库里保存单词。</span>
+            </div>
+          </div>
+
+          <article class="answer" id="answerBox" aria-live="polite">
+            <div class="answer-word" id="answerWord"></div>
+            <div class="ipa" id="answerPhonetic" dir="ltr"></div>
+            <div class="meaning" id="answerMeaning"></div>
+            <div class="source" id="answerSource"></div>
+          </article>
+
+          <div class="actions">
+            <button class="btn primary" id="playBtn" type="button">播放</button>
+            <button class="btn warm" id="revealBtn" type="button">显示答案</button>
+            <button class="btn soft" id="nextBtn" type="button">下一个</button>
+          </div>
+
+          <div class="two">
+            <label>语速
+              <select id="rateSelect">
+                <option value="0.78">慢速</option>
+                <option value="0.9" selected>标准</option>
+                <option value="1.05">稍快</option>
+              </select>
+            </label>
+            <label>连读
+              <select id="repeatSelect">
+                <option value="1" selected>1 次</option>
+                <option value="2">2 次</option>
+                <option value="3">3 次</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="head">
+          <h2 class="title">词库</h2>
+          <button class="btn ghost" id="clearLookupBtn" type="button">清除查询缓存</button>
+        </div>
+        <div class="body">
+          <form class="form" id="wordForm">
+            <div class="field">
+              <label for="wordInput">英语单词</label>
+              <div class="lookup-row">
+                <input id="wordInput" autocomplete="off" placeholder="例如：refresh" required>
+                <button class="btn ghost" id="lookupBtn" type="button">查询</button>
+              </div>
+              <div class="status" id="lookupStatus">输入单词后点“查询”，确认无误再保存。</div>
+            </div>
+
+            <label>美音音标
+              <input id="phoneticInput" autocomplete="off" placeholder="例如：/rɪˈfrɛʃ/" dir="ltr">
+            </label>
+
+            <label>中文意思
+              <textarea id="meaningInput" placeholder="例如：v. 刷新；使恢复精神；重新整理"></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="btn primary" id="saveBtn" type="submit">保存</button>
+              <button class="btn ghost hidden" id="cancelEditBtn" type="button">取消编辑</button>
+              <span class="hint">查询只做辅助；看到“不确定”时请手动改成你认可的意思。</span>
+            </div>
+          </form>
+
+          <div class="library-tools">
+            <label>搜索
+              <input id="searchInput" autocomplete="off" placeholder="查找单词、音标或中文意思">
+            </label>
+            <button class="btn danger" id="clearAllBtn" type="button">清空词库</button>
+          </div>
+
+          <div class="backup">
+            <button class="btn ghost" id="exportBtn" type="button">导出备份</button>
+            <label class="btn ghost" for="importInput">导入备份</label>
+            <input class="hidden" id="importInput" type="file" accept="application/json,.json">
+          </div>
+
+          <ul class="list" id="wordList"></ul>
+          <div class="empty" id="emptyState">词库还是空的。输入一个单词，查询后保存。</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const STORE_KEY = "vocab-listening-words-v5";
+    const SETTINGS_KEY = "vocab-listening-settings-v5";
+    const LOOKUP_CACHE_KEY = "vocab-lookup-cache-v5";
+    const OLD_CACHE_KEYS = ["vocab-lookup-cache-v4", "vocab-lookup-cache-v3", "vocab-lookup-cache-v2"];
+
+    const TRUSTED = {
+      refresh: { phonetic: "/rɪˈfrɛʃ/", meaning: "v. 刷新；使恢复精神；重新整理", source: "内置校准" },
+      subtle: { phonetic: "/ˈsʌtəl/", meaning: "adj. 微妙的；不易察觉的；精细的", source: "内置校准" },
+      resilient: { phonetic: "/rɪˈzɪliənt/", meaning: "adj. 有复原力的；能迅速恢复的", source: "内置校准" },
+      momentum: { phonetic: "/moʊˈmentəm/", meaning: "n. 动力；势头；动量", source: "内置校准" },
+      constraint: { phonetic: "/kənˈstreɪnt/", meaning: "n. 限制；约束；制约因素", source: "内置校准" }
+    };
+
+    const $ = id => document.getElementById(id);
+    const els = {
+      wordCount: $("wordCount"),
+      roundCount: $("roundCount"),
+      randomMode: $("randomMode"),
+      orderMode: $("orderMode"),
+      listenBox: $("listenBox"),
+      listenTitle: $("listenTitle"),
+      listenText: $("listenText"),
+      answerBox: $("answerBox"),
+      answerWord: $("answerWord"),
+      answerPhonetic: $("answerPhonetic"),
+      answerMeaning: $("answerMeaning"),
+      answerSource: $("answerSource"),
+      playBtn: $("playBtn"),
+      revealBtn: $("revealBtn"),
+      nextBtn: $("nextBtn"),
+      rateSelect: $("rateSelect"),
+      repeatSelect: $("repeatSelect"),
+      wordForm: $("wordForm"),
+      wordInput: $("wordInput"),
+      lookupBtn: $("lookupBtn"),
+      phoneticInput: $("phoneticInput"),
+      meaningInput: $("meaningInput"),
+      lookupStatus: $("lookupStatus"),
+      saveBtn: $("saveBtn"),
+      cancelEditBtn: $("cancelEditBtn"),
+      clearLookupBtn: $("clearLookupBtn"),
+      searchInput: $("searchInput"),
+      clearAllBtn: $("clearAllBtn"),
+      exportBtn: $("exportBtn"),
+      importInput: $("importInput"),
+      wordList: $("wordList"),
+      emptyState: $("emptyState"),
+      toast: $("toast")
+    };
+
+    let words = loadJson(STORE_KEY, []);
+    let settings = Object.assign({ mode: "random" }, loadJson(SETTINGS_KEY, {}));
+    let lookupCache = loadJson(LOOKUP_CACHE_KEY, {});
+    let currentIndex = -1;
+    let roundCount = 0;
+    let editingId = null;
+    let speakingTimer = null;
+
+    init();
+
+    function init() {
+      setMode(settings.mode);
+      render();
+      chooseNext(false, false);
+      bindEvents();
+      registerServiceWorker();
+    }
+
+    function bindEvents() {
+      els.randomMode.addEventListener("click", () => setMode("random"));
+      els.orderMode.addEventListener("click", () => setMode("order"));
+      els.playBtn.addEventListener("click", playCurrent);
+      els.revealBtn.addEventListener("click", revealAnswer);
+      els.nextBtn.addEventListener("click", () => chooseNext(true, true));
+      els.lookupBtn.addEventListener("click", lookupWord);
+      els.wordInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          lookupWord();
+        }
+      });
+      els.wordForm.addEventListener("submit", saveWord);
+      els.cancelEditBtn.addEventListener("click", cancelEdit);
+      els.clearLookupBtn.addEventListener("click", clearLookupCache);
+      els.searchInput.addEventListener("input", renderList);
+      els.clearAllBtn.addEventListener("click", clearAllWords);
+      els.exportBtn.addEventListener("click", exportBackup);
+      els.importInput.addEventListener("change", importBackup);
+    }
+
+    async function lookupWord() {
+      const word = clean(els.wordInput.value);
+      if (!word) {
+        setLookupStatus("先输入英语单词。", "warn");
+        return;
+      }
+      const key = word.toLowerCase();
+      if (TRUSTED[key]) return applyLookup(word, TRUSTED[key], true);
+      if (lookupCache[key]) return applyLookup(word, lookupCache[key], true);
+
+      setLookupStatus("正在查询美音音标和中文意思...", "");
+      els.lookupBtn.disabled = true;
+      try {
+        const result = await lookupOnline(word);
+        if (!result.phonetic && !result.meaning) {
+          setLookupStatus("没有查到可靠结果，请手动填写后保存。", "warn");
+          return;
+        }
+        lookupCache[key] = result;
+        localStorage.setItem(LOOKUP_CACHE_KEY, JSON.stringify(lookupCache));
+        applyLookup(word, result, false);
+      } catch (error) {
+        setLookupStatus("查询失败。请检查网络，或手动填写后保存。", "warn");
+      } finally {
+        els.lookupBtn.disabled = false;
+      }
+    }
+
+    async function lookupOnline(word) {
+      const result = { phonetic: "", meaning: "", source: "" };
+
+      const fd = await fetchJson(`https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}?translations=true&pretty=false`);
+      if (fd) {
+        result.phonetic = pickAmericanPhonetic(fd);
+        result.meaning = pickChineseMeaning(fd, word);
+        if (result.phonetic || result.meaning) result.source = "FreeDictionaryAPI";
+      }
+
+      if (!result.phonetic) {
+        const dd = await fetchJson(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+        if (dd) {
+          result.phonetic = pickAmericanPhonetic(dd);
+          if (result.phonetic) result.source = result.source ? `${result.source} + dictionaryapi.dev` : "dictionaryapi.dev";
+        }
+      }
+
+      if (!result.phonetic) {
+        const dm = await fetchJson(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&md=r&max=1`);
+        const arpabet = Array.isArray(dm) ? dm[0]?.tags?.find(tag => tag.startsWith("pron:"))?.slice(5) : "";
+        result.phonetic = arpabetToIpa(arpabet || "");
+        if (result.phonetic) result.source = result.source ? `${result.source} + Datamuse` : "Datamuse";
+      }
+
+      if (!result.meaning) {
+        const mt = await fetchJson(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-CN`);
+        const translated = clean(mt?.responseData?.translatedText || "");
+        if (isChineseMeaning(translated, word)) {
+          result.meaning = translated;
+          result.source = result.source ? `${result.source} + 机器翻译` : "机器翻译";
+        }
+      }
+
+      result.phonetic = normalizePhonetic(result.phonetic);
+      result.meaning = sanitizeMeaning(result.meaning, word);
+      return result;
+    }
+
+    function applyLookup(word, result, fromCache) {
+      els.wordInput.value = word;
+      els.phoneticInput.value = normalizePhonetic(result.phonetic);
+      els.meaningInput.value = sanitizeMeaning(result.meaning, word);
+      const unsure = String(result.source || "").includes("机器翻译") || !els.meaningInput.value;
+      const message = unsure
+        ? "已填入可用结果；中文意思不够确定，请核对后保存。"
+        : fromCache ? "已从缓存填入，请确认后保存。" : "已填入美音音标和中文意思，请确认后保存。";
+      setLookupStatus(message, unsure ? "warn" : "good");
+    }
+
+    function pickAmericanPhonetic(data) {
+      const items = [];
+      walk(data, (value, key, parent) => {
+        if (typeof value !== "string") return;
+        if (!/(phonetic|pronunciation|ipa|text)$/i.test(key)) return;
+        if (!/[ɑæʌɔəɚɝɪiʊuɛeɒθðʃʒŋˈˌ]/.test(value) && !value.includes("/")) return;
+        const info = `${parent?.audio || ""} ${parent?.sourceUrl || ""} ${parent?.dialect || ""} ${parent?.region || ""} ${parent?.country || ""} ${parent?.accent || ""} ${parent?.type || ""}`;
+        items.push({ text: value, score: scoreAmerican(info) });
+      });
+      items.sort((a, b) => b.score - a.score);
+      return normalizePhonetic(items[0]?.text || "");
+    }
+
+    function scoreAmerican(info) {
+      const text = String(info).toLowerCase();
+      let score = 0;
+      if (/us|usa|american|en-us|united states/.test(text)) score += 10;
+      if (/uk|british|gb|en-gb/.test(text)) score -= 6;
+      return score;
+    }
+
+    function pickChineseMeaning(data, word) {
+      const choices = [];
+      walk(data, (value, key) => {
+        if (typeof value !== "string") return;
+        const text = cleanTranslation(value);
+        if (!isChineseMeaning(text, word)) return;
+        const lowerKey = String(key).toLowerCase();
+        let score = 1;
+        if (/translation|zh|cmn|mandarin|chinese/.test(lowerKey)) score += 6;
+        if (/definition|meaning/.test(lowerKey)) score += 2;
+        choices.push({ text, score });
+      });
+      const unique = [];
+      for (const item of choices.sort((a, b) => b.score - a.score)) {
+        if (!unique.some(old => old.text === item.text)) unique.push(item);
+        if (unique.length >= 3) break;
+      }
+      return unique.map(item => item.text).join("；");
+    }
+
+    function walk(value, visitor, key = "", parent = null) {
+      visitor(value, key, parent);
+      if (Array.isArray(value)) value.forEach(item => walk(item, key, value));
+      else if (value && typeof value === "object") {
+        Object.keys(value).forEach(childKey => walk(value[childKey], childKey, value));
+      }
+    }
+
+    function arpabetToIpa(value) {
+      const units = clean(value).split(/\s+/).map(token => {
+        const stress = token.match(/[0-2]$/)?.[0] || "0";
+        const base = token.replace(/[0-2]$/, "");
+        return { base, stress: Number(stress), vowel: Boolean(VOWELS[base]) };
+      }).filter(unit => VOWELS[unit.base] || CONSONANTS[unit.base]);
+      if (!units.length) return "";
+      const markers = {};
+      let lastVowel = -1;
+      units.forEach((unit, index) => {
+        if (!unit.vowel) return;
+        if (unit.stress === 1 || unit.stress === 2) {
+          let onset = index;
+          while (onset > lastVowel + 1 && !units[onset - 1].vowel) onset -= 1;
+          markers[onset] = unit.stress === 1 ? "ˈ" : "ˌ";
+        }
+        lastVowel = index;
+      });
+      let text = "";
+      units.forEach((unit, index) => {
+        if (markers[index]) text += markers[index];
+        text += unit.vowel ? mapVowel(unit) : CONSONANTS[unit.base];
+      });
+      return normalizePhonetic(text);
+    }
+
+    function mapVowel(unit) {
+      if (unit.base === "AH" && unit.stress === 0) return "ə";
+      if (unit.base === "ER" && unit.stress === 0) return "ɚ";
+      if (unit.base === "ER") return "ɝ";
+      return VOWELS[unit.base] || "";
+    }
+
+    const VOWELS = { AA: "ɑ", AE: "æ", AH: "ʌ", AO: "ɔ", AW: "aʊ", AY: "aɪ", EH: "ɛ", ER: "ɝ", EY: "eɪ", IH: "ɪ", IY: "i", OW: "oʊ", OY: "ɔɪ", UH: "ʊ", UW: "u" };
+    const CONSONANTS = { B: "b", CH: "tʃ", D: "d", DH: "ð", F: "f", G: "g", HH: "h", JH: "dʒ", K: "k", L: "l", M: "m", N: "n", NG: "ŋ", P: "p", R: "r", S: "s", SH: "ʃ", T: "t", TH: "θ", V: "v", W: "w", Y: "j", Z: "z", ZH: "ʒ" };
+
+    async function fetchJson(url) {
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) return null;
+        return await response.json();
+      } catch {
+        return null;
+      }
+    }
+
+    function saveWord(event) {
+      event.preventDefault();
+      const word = clean(els.wordInput.value);
+      if (!word) {
+        setLookupStatus("先输入英语单词。", "warn");
+        return;
+      }
+      const phonetic = normalizePhonetic(els.phoneticInput.value);
+      const meaning = clean(els.meaningInput.value);
+      const now = new Date().toISOString();
+      const duplicate = words.find(item => item.word.toLowerCase() === word.toLowerCase());
+
+      if (editingId) {
+        words = words.map(item => item.id === editingId ? { ...item, word, phonetic, meaning, source: "手动确认", updatedAt: now } : item);
+        toast("已更新");
+      } else if (duplicate) {
+        Object.assign(duplicate, { word, phonetic, meaning, source: "手动确认", updatedAt: now });
+        toast("已更新已有单词");
+      } else {
+        words.unshift({ id: newId(), word, phonetic, meaning, source: "手动确认", createdAt: now, updatedAt: now });
+        toast("已保存");
+      }
+
+      saveWords();
+      resetForm();
+      render();
+      if (currentIndex === -1) chooseNext(false, false);
+    }
+
+    function render() {
+      els.wordCount.textContent = `${words.length} 个单词`;
+      els.roundCount.textContent = `本轮 ${roundCount} 个`;
+      renderList();
+      syncControls();
+    }
+
+    function renderList() {
+      const query = clean(els.searchInput.value).toLowerCase();
+      const visible = words.filter(item => `${item.word} ${item.phonetic} ${item.meaning}`.toLowerCase().includes(query));
+      els.wordList.innerHTML = "";
+      els.emptyState.classList.toggle("hidden", words.length > 0);
+      els.wordList.classList.toggle("hidden", words.length === 0);
+
+      for (const item of visible) {
+        const li = document.createElement("li");
+        li.className = "item";
+        li.innerHTML = `
+          <div>
+            <div class="word"></div>
+            <div class="meta"></div>
+          </div>
+          <div class="item-actions">
+            <button class="mini" type="button" data-action="play" title="播放">▶</button>
+            <button class="mini" type="button" data-action="edit" title="编辑">改</button>
+            <button class="mini" type="button" data-action="delete" title="删除">删</button>
+          </div>
+        `;
+        li.querySelector(".word").textContent = item.word;
+        li.querySelector(".meta").textContent = [normalizePhonetic(item.phonetic), item.meaning].filter(Boolean).join(" · ") || "未填写音标和释义";
+        li.querySelectorAll("button").forEach(button => {
+          button.addEventListener("click", () => {
+            if (button.dataset.action === "play") speak(item.word);
+            if (button.dataset.action === "edit") editWord(item);
+            if (button.dataset.action === "delete") deleteWord(item.id);
+          });
+        });
+        els.wordList.appendChild(li);
+      }
+
+      if (words.length && !visible.length) els.wordList.innerHTML = `<li class="empty">没有匹配的单词。</li>`;
+    }
+
+    function chooseNext(count = true, autoPlay = true) {
+      stopSpeaking();
+      hideAnswer();
+      if (!words.length) {
+        currentIndex = -1;
+        els.listenTitle.textContent = "暂无单词可播放";
+        els.listenText.textContent = "先在词库里保存单词。";
+        syncControls();
+        return;
+      }
+      if (settings.mode === "order") currentIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % words.length;
+      else if (words.length === 1) currentIndex = 0;
+      else {
+        let next = currentIndex;
+        while (next === currentIndex) next = Math.floor(Math.random() * words.length);
+        currentIndex = next;
+      }
+      if (count) roundCount += 1;
+      render();
+      els.listenTitle.textContent = "当前单词已准备好";
+      els.listenText.textContent = "先听读音，判断自己是否听出来。";
+      if (autoPlay) window.setTimeout(playCurrent, 80);
+    }
+
+    function currentWord() { return currentIndex >= 0 ? words[currentIndex] : null; }
+    function playCurrent() {
+      const item = currentWord();
+      if (!item) return toast("词库里还没有单词");
+      speak(item.word);
+    }
+
+    function speak(text) {
+      if (!("speechSynthesis" in window)) return toast("当前浏览器不支持朗读");
+      stopSpeaking();
+      let remaining = Number(els.repeatSelect.value);
+      const rate = Number(els.rateSelect.value);
+      const run = () => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = rate;
+        utterance.pitch = 1;
+        const voices = window.speechSynthesis.getVoices();
+        utterance.voice = voices.find(voice => /^en[-_]US$/i.test(voice.lang)) ||
+          voices.find(voice => /american|united states|\bUS\b/i.test(voice.name)) ||
+          voices.find(voice => /^en[-_]/i.test(voice.lang)) || null;
+        utterance.onstart = () => {
+          els.listenBox.classList.add("speaking");
+          els.listenText.textContent = "正在播放...";
+        };
+        utterance.onend = () => {
+          remaining -= 1;
+          if (remaining > 0) speakingTimer = window.setTimeout(run, 420);
+          else {
+            els.listenBox.classList.remove("speaking");
+            els.listenText.textContent = "播放完成，判断自己是否听出来。";
+          }
+        };
+        utterance.onerror = () => {
+          els.listenBox.classList.remove("speaking");
+          els.listenText.textContent = "播放失败，请再试一次。";
+        };
+        window.speechSynthesis.speak(utterance);
+      };
+      run();
+    }
+
+    function stopSpeaking() {
+      if (speakingTimer) window.clearTimeout(speakingTimer);
+      speakingTimer = null;
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      els.listenBox.classList.remove("speaking");
+    }
+
+    function revealAnswer() {
+      const item = currentWord();
+      if (!item) return toast("词库里还没有单词");
+      els.answerWord.textContent = item.word;
+      els.answerPhonetic.textContent = normalizePhonetic(item.phonetic) || "未填写音标";
+      els.answerMeaning.textContent = item.meaning || "未填写中文意思";
+      els.answerSource.textContent = item.source ? `来源：${item.source}` : "";
+      els.answerBox.classList.add("show");
+    }
+
+    function hideAnswer() {
+      els.answerBox.classList.remove("show");
+      els.answerWord.textContent = "";
+      els.answerPhonetic.textContent = "";
+      els.answerMeaning.textContent = "";
+      els.answerSource.textContent = "";
+    }
+
+    function editWord(item) {
+      editingId = item.id;
+      els.wordInput.value = item.word;
+      els.phoneticInput.value = normalizePhonetic(item.phonetic);
+      els.meaningInput.value = item.meaning || "";
+      els.saveBtn.textContent = "更新";
+      els.cancelEditBtn.classList.remove("hidden");
+      setLookupStatus("正在编辑，可以重新查询或手动修改。");
+      els.wordInput.focus();
+    }
+
+    function deleteWord(id) {
+      const item = words.find(word => word.id === id);
+      if (!item || !window.confirm(`删除 “${item.word}”？`)) return;
+      const index = words.findIndex(word => word.id === id);
+      words = words.filter(word => word.id !== id);
+      if (index === currentIndex) currentIndex = -1;
+      if (index < currentIndex) currentIndex -= 1;
+      saveWords();
+      render();
+      if (currentIndex === -1) chooseNext(false, false);
+      toast("已删除");
+    }
+
+    function cancelEdit() {
+      resetForm();
+      toast("已取消编辑");
+    }
+
+    function resetForm() {
+      editingId = null;
+      els.wordForm.reset();
+      els.saveBtn.textContent = "保存";
+      els.cancelEditBtn.classList.add("hidden");
+      setLookupStatus("输入单词后点“查询”，确认无误再保存。");
+    }
+
+    function clearLookupCache() {
+      lookupCache = {};
+      localStorage.removeItem(LOOKUP_CACHE_KEY);
+      OLD_CACHE_KEYS.forEach(key => localStorage.removeItem(key));
+      setLookupStatus("已清除查询缓存，可以重新查询。", "good");
+      toast("已清除查询缓存");
+    }
+
+    function clearAllWords() {
+      if (!words.length) return toast("词库已经是空的");
+      if (!window.confirm("确定清空整个词库？")) return;
+      words = [];
+      currentIndex = -1;
+      roundCount = 0;
+      saveWords();
+      hideAnswer();
+      render();
+      chooseNext(false, false);
+      toast("已清空词库");
+    }
+
+    function exportBackup() {
+      if (!words.length) return toast("词库为空，暂无可导出的内容");
+      const blob = new Blob([JSON.stringify({ app: "vocab-listening-app", version: 5, exportedAt: new Date().toISOString(), words }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `听音背单词-词库备份-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast("已导出备份");
+    }
+
+    async function importBackup(event) {
+      const file = event.target.files[0];
+      event.target.value = "";
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        const incoming = Array.isArray(data) ? data : data.words;
+        if (!Array.isArray(incoming)) throw new Error("bad backup");
+        const existing = new Map(words.map(item => [item.word.toLowerCase(), item]));
+        let changed = 0;
+        for (const item of incoming) {
+          const word = clean(item.word || "");
+          if (!word) continue;
+          const next = {
+            id: existing.get(word.toLowerCase())?.id || item.id || newId(),
+            word,
+            phonetic: normalizePhonetic(item.phonetic || ""),
+            meaning: clean(item.meaning || ""),
+            source: item.source || "导入备份",
+            createdAt: item.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          if (existing.has(word.toLowerCase())) Object.assign(existing.get(word.toLowerCase()), next);
+          else words.push(next);
+          changed += 1;
+        }
+        saveWords();
+        render();
+        if (currentIndex === -1) chooseNext(false, false);
+        toast(changed ? `已导入 ${changed} 个单词` : "备份里没有可导入的单词");
+      } catch {
+        toast("导入失败，请选择正确的备份文件");
+      }
+    }
+
+    function setMode(mode) {
+      settings.mode = mode === "order" ? "order" : "random";
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      els.randomMode.setAttribute("aria-selected", settings.mode === "random");
+      els.orderMode.setAttribute("aria-selected", settings.mode === "order");
+    }
+
+    function syncControls() {
+      const hasWords = words.length > 0;
+      els.playBtn.disabled = !hasWords;
+      els.revealBtn.disabled = !hasWords;
+      els.nextBtn.disabled = !hasWords;
+      els.clearAllBtn.disabled = !hasWords;
+      els.exportBtn.disabled = !hasWords;
+    }
+
+    function saveWords() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(words));
+    }
+
+    function loadJson(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+      catch { return fallback; }
+    }
+
+    function clean(value) {
+      return String(value || "").trim().replace(/\s+/g, " ");
+    }
+
+    function cleanTranslation(value) {
+      return clean(value).replace(/\s*[;；。]+$/g, "");
+    }
+
+    function isChineseMeaning(value, word) {
+      const text = clean(value);
+      if (!/[\u4e00-\u9fff]/.test(text)) return false;
+      if (text.toLowerCase() === String(word || "").toLowerCase()) return false;
+      return text.length <= 120;
+    }
+
+    function sanitizeMeaning(value, word) {
+      const text = clean(String(value || "")).replace(/\s*[;；]\s*/g, "；");
+      if (!isChineseMeaning(text, word)) return "";
+      return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+    }
+
+    function normalizePhonetic(value) {
+      let text = clean(value)
+        .replace(/[［\[]/g, "/")
+        .replace(/[］\]]/g, "/")
+        .replace(/[／]/g, "/")
+        .replace(/\u0279/g, "r")
+        .replace(/\u1d4a/g, "ə")
+        .replace(/\u02d0/g, ":")
+        .replace(/'/g, "ˈ");
+      if (!text) return "";
+      text = text.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
+      return `/${text}/`;
+    }
+
+    function newId() {
+      return window.crypto?.randomUUID ? window.crypto.randomUUID() : `word-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function setLookupStatus(message, tone = "") {
+      els.lookupStatus.textContent = message;
+      els.lookupStatus.classList.toggle("good", tone === "good");
+      els.lookupStatus.classList.toggle("warn", tone === "warn");
+    }
+
+    function toast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      window.clearTimeout(toast.timer);
+      toast.timer = window.setTimeout(() => els.toast.classList.remove("show"), 1800);
+    }
+
+    function registerServiceWorker() {
+      if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+        navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+      }
+    }
+  </script>
+</body>
+</html>
