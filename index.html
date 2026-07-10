@@ -609,7 +609,8 @@
         if (typeof value !== "string") return;
         if (!/(phonetic|pronunciation|ipa|text)$/i.test(key)) return;
         if (!/[ɑæʌɔəɚɝɪiʊuɛeɒθðʃʒŋˈˌ]/.test(value) && !value.includes("/")) return;
-        const info = `${parent?.audio || ""} ${parent?.sourceUrl || ""} ${parent?.dialect || ""} ${parent?.region || ""} ${parent?.country || ""} ${parent?.accent || ""} ${parent?.type || ""}`;
+        const tags = Array.isArray(parent?.tags) ? parent.tags.join(" ") : parent?.tags || "";
+        const info = `${parent?.audio || ""} ${parent?.sourceUrl || ""} ${parent?.dialect || ""} ${parent?.region || ""} ${parent?.country || ""} ${parent?.accent || ""} ${parent?.type || ""} ${tags}`;
         items.push({ text: value, score: scoreAmerican(info) });
       });
       items.sort((a, b) => b.score - a.score);
@@ -646,9 +647,9 @@
 
     function walk(value, visitor, key = "", parent = null) {
       visitor(value, key, parent);
-      if (Array.isArray(value)) value.forEach(item => walk(item, key, value));
+      if (Array.isArray(value)) value.forEach(item => walk(item, visitor, key, value));
       else if (value && typeof value === "object") {
-        Object.keys(value).forEach(childKey => walk(value[childKey], childKey, value));
+        Object.keys(value).forEach(childKey => walk(value[childKey], visitor, childKey, value));
       }
     }
 
