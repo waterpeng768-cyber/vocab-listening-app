@@ -531,8 +531,8 @@
         return;
       }
       const key = word.toLowerCase();
-      if (TRUSTED[key]) return applyLookup(word, TRUSTED[key], true);
-      if (lookupCache[key]) return applyLookup(word, lookupCache[key], true);
+      if (TRUSTED[key]) return applyLookup(word, TRUSTED[key], "trusted");
+      if (lookupCache[key]) return applyLookup(word, lookupCache[key], "cache");
 
       setLookupStatus("正在查询美音音标和中文意思...", "");
       els.lookupBtn.disabled = true;
@@ -544,7 +544,7 @@
         }
         lookupCache[key] = result;
         localStorage.setItem(LOOKUP_CACHE_KEY, JSON.stringify(lookupCache));
-        applyLookup(word, result, false);
+        applyLookup(word, result, "online");
       } catch (error) {
         setLookupStatus("查询失败。请检查网络，或手动填写后保存。", "warn");
       } finally {
@@ -591,14 +591,15 @@
       return result;
     }
 
-    function applyLookup(word, result, fromCache) {
+    function applyLookup(word, result, mode) {
       els.wordInput.value = word;
       els.phoneticInput.value = normalizePhonetic(result.phonetic);
       els.meaningInput.value = sanitizeMeaning(result.meaning, word);
       const unsure = String(result.source || "").includes("机器翻译") || !els.meaningInput.value;
       const message = unsure
         ? "已填入可用结果；中文意思不够确定，请核对后保存。"
-        : fromCache ? "已从缓存填入，请确认后保存。" : "已填入美音音标和中文意思，请确认后保存。";
+        : mode === "trusted" ? "已填入内置校准的美音音标和中文意思，请确认后保存。"
+        : mode === "cache" ? "已从缓存填入，请确认后保存。" : "已填入美音音标和中文意思，请确认后保存。";
       setLookupStatus(message, unsure ? "warn" : "good");
     }
 
