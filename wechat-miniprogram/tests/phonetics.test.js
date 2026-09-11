@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   normalizeWord,
   normalizePhonetic,
+  classifyAccent,
   pickAmericanPhonetic
 } = require('../utils/phonetics');
 
@@ -26,4 +27,8 @@ test('does not present a UK-only IPA as American', () => {
     pickAmericanPhonetic([{ value: '/tuːl/', region: 'British English' }]),
     { phonetic: '', accent: 'uk-only' }
   );
+});
+
+test('does not classify USA as an explicit American label', () => {
+  assert.equal(classifyAccent('USA'), 'generic');
 });

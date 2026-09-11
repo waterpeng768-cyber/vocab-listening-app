@@ -12,7 +12,7 @@ function normalizePhonetic(value) {
 
 function classifyAccent(value) {
   const label = String(value || '').toLowerCase();
-  if (/(^|[^a-z])(us|usa|american|en-us)([^a-z]|$)/.test(label)) return 'us';
+  if (/(^|[^a-z])(us|american|en-us)([^a-z]|$)/.test(label)) return 'us';
   if (/(^|[^a-z])(uk|british|england|en-gb)([^a-z]|$)/.test(label)) return 'uk';
   return 'generic';
 }
