@@ -94,7 +94,9 @@ function createStorage(wxStorage) {
 
   function readState() {
     const current = wxStorage.getStorageSync(STATE_KEY);
-    if (current !== undefined && current !== null) return sanitizeState(current);
+    if (current && current.version === 1 && Array.isArray(current.words)) {
+      return sanitizeState(current);
+    }
 
     let legacyWords = [];
     for (const key of LEGACY_KEYS) {
@@ -161,6 +163,7 @@ function createStorage(wxStorage) {
     }
 
     const incoming = sanitizeState({ words: parsed.words }).words;
+    if (!incoming.length) throw new Error('备份中没有有效词库');
     const state = readState();
     const words = mergeWords(state.words, incoming);
     writeState({ ...state, words });

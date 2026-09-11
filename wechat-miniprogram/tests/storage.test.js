@@ -58,6 +58,23 @@ test('rejects a parsed backup without words before writing', () => {
   assert.equal(memory.writes.length, 0);
 });
 
+test('rejects an import with no valid rows without changing current state', () => {
+  const current = {
+    version: 1,
+    words: [{ word: 'tool', meaning: '工具' }],
+    settings: { mode: 'random', rate: 1 }
+  };
+  const memory = memoryStorage({ 'vocab-listening-state-v1': current });
+  const service = createStorage(memory);
+
+  assert.throws(
+    () => service.importBackup(JSON.stringify({ words: [{ word: '   ' }, null, {}] })),
+    /备份中没有有效词库/
+  );
+  assert.equal(memory.writes.length, 0);
+  assert.deepEqual(memory.values['vocab-listening-state-v1'], current);
+});
+
 test('migrates a legacy bare array and keeps valid rows', () => {
   const memory = memoryStorage({
     'vocab-listening-words': [
@@ -101,6 +118,20 @@ test('current versioned state takes priority over both legacy keys', () => {
 
   assert.deepEqual(state.words.map((item) => item.word), ['current']);
   assert.deepEqual(state.settings, { mode: 'sequential', rate: 0.8 });
+});
+
+test('recovers legacy words when the current versioned state is damaged', () => {
+  const memory = memoryStorage({
+    'vocab-listening-state-v1': { version: 1, words: 'damaged' },
+    'vocab-listening-words-v5': [
+      { word: 'Resilient', phonetic: '[rɪˈzɪliənt]', meaning: '有复原力的' }
+    ]
+  });
+
+  const state = createStorage(memory).loadState();
+
+  assert.deepEqual(state.words.map((item) => item.word), ['resilient']);
+  assert.equal(state.words[0].phonetic, '/rɪˈzɪliənt/');
 });
 
 test('accepts the version 5 web backup and merges without replacing local words', () => {
