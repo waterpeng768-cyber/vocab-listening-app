@@ -95,7 +95,8 @@ function createStorage(wxStorage) {
   function readState() {
     const current = wxStorage.getStorageSync(STATE_KEY);
     if (current && current.version === 1 && Array.isArray(current.words)) {
-      return sanitizeState(current);
+      const sanitizedCurrent = sanitizeState(current);
+      if (!current.words.length || sanitizedCurrent.words.length) return sanitizedCurrent;
     }
 
     let legacyWords = [];

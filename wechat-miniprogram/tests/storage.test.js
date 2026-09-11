@@ -134,6 +134,20 @@ test('recovers legacy words when the current versioned state is damaged', () => 
   assert.equal(state.words[0].phonetic, '/rɪˈzɪliənt/');
 });
 
+test('recovers legacy words when non-empty current rows are all corrupt', () => {
+  const memory = memoryStorage({
+    'vocab-listening-state-v1': { version: 1, words: [null, {}, { word: '   ' }] },
+    'vocab-listening-words': [
+      { word: 'Refresh', phonetic: '[rɪˈfrɛʃ]', meaning: '刷新' }
+    ]
+  });
+
+  const state = createStorage(memory).loadState();
+
+  assert.deepEqual(state.words.map((item) => item.word), ['refresh']);
+  assert.equal(state.words[0].phonetic, '/rɪˈfrɛʃ/');
+});
+
 test('accepts the version 5 web backup and merges without replacing local words', () => {
   const service = createStorage(memoryStorage());
   const original = service.saveWord({ word: 'tool', meaning: '工具' });
