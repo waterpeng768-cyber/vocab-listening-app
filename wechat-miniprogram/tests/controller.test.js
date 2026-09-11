@@ -3,14 +3,43 @@ const assert = require('node:assert/strict');
 const { createController } = require('../pages/index/controller');
 
 function fakeDependencies(options = {}) {
-  const words = options.words || [];
-  const calls = { audioPlay: [], audioDestroy: 0, changes: [] };
+  const persisted = {
+    version: 1,
+    words: (options.words || []).map((word) => ({ ...word })),
+    settings: { mode: 'random', rate: 1 }
+  };
+  const calls = {
+    audioPlay: [],
+    audioDestroy: 0,
+    changes: [],
+    deletedIds: [],
+    settingsPatches: []
+  };
   const dependencies = {
     storage: {
-      loadState: () => ({ version: 1, words, settings: { mode: 'random', rate: 1 } }),
-      saveWord: (word) => word,
-      deleteWord: () => words,
-      saveSettings: () => undefined
+      loadState: () => ({
+        version: persisted.version,
+        words: persisted.words.map((word) => ({ ...word })),
+        settings: { ...persisted.settings }
+      }),
+      saveWord: (word) => {
+        const saved = { ...word, id: word.id || `saved-${persisted.words.length + 1}` };
+        const index = persisted.words.findIndex((item) => item.word === saved.word);
+        if (index === -1) persisted.words.push(saved);
+        else persisted.words[index] = { ...persisted.words[index], ...saved };
+        return { ...saved };
+      },
+      deleteWord: (id) => {
+        calls.deletedIds.push(id);
+        const length = persisted.words.length;
+        persisted.words = persisted.words.filter((word) => word.id !== id);
+        return persisted.words.length !== length;
+      },
+      saveSettings: (patch) => {
+        calls.settingsPatches.push({ ...patch });
+        persisted.settings = { ...persisted.settings, ...patch };
+        return { ...persisted.settings };
+      }
     },
     lookup: async () => {
       if (options.lookupErrorCode) {
@@ -34,7 +63,7 @@ function fakeDependencies(options = {}) {
     randomFn: () => 0,
     onChange: (state) => { calls.changes.push(state); }
   };
-  return { dependencies, calls };
+  return { dependencies, calls, persisted };
 }
 
 test('keeps answer hidden until revealAnswer is called', () => {
@@ -91,10 +120,10 @@ test('rejects an empty word but allows manually blank phonetic and meaning', () 
   const controller = createController(dependencies);
 
   assert.throws(() => controller.saveDraft({ word: '   ', meaning: 'ignored' }), /有效单词/);
-  assert.deepEqual(
-    controller.saveDraft({ word: 'tool', phonetic: '', meaning: '' }),
-    { word: 'tool', phonetic: '', meaning: '' }
-  );
+  const saved = controller.saveDraft({ word: 'tool', phonetic: '', meaning: '' });
+  assert.equal(saved.word, 'tool');
+  assert.equal(saved.phonetic, '');
+  assert.equal(saved.meaning, '');
 });
 
 test('moves sequentially, wraps, and hides the next answer', () => {
@@ -172,4 +201,54 @@ test('getState protects lookup warnings from consumer mutation', async () => {
   exposed.draft.warnings.push('changed');
 
   assert.deepEqual(controller.getState().draft.warnings, []);
+});
+
+test('saveDraft reloads persisted words after editing an id to a new word', () => {
+  const { dependencies } = fakeDependencies({ words: [{ id: '1', word: 'tool' }] });
+  const controller = createController(dependencies);
+  controller.initialize();
+
+  controller.saveDraft({ id: '1', word: 'instrument', phonetic: '', meaning: '工具' });
+
+  assert.deepEqual(controller.getState().words, dependencies.storage.loadState().words);
+  assert.deepEqual(controller.getState().words.map((word) => word.word), ['tool', 'instrument']);
+});
+
+test('deleteWord reloads storage and safely selects the word at the deleted position', () => {
+  const words = [
+    { id: '1', word: 'tool' },
+    { id: '2', word: 'refresh' },
+    { id: '3', word: 'resilient' }
+  ];
+  const { dependencies, calls } = fakeDependencies({ words });
+  dependencies.storage.saveSettings({ mode: 'sequential' });
+  const controller = createController(dependencies);
+  controller.initialize();
+  controller.moveNext();
+
+  assert.equal(controller.deleteWord('2'), true);
+  assert.deepEqual(calls.deletedIds, ['2']);
+  assert.deepEqual(controller.getState().words, dependencies.storage.loadState().words);
+  assert.equal(controller.getState().currentIndex, 1);
+  assert.equal(controller.getState().currentWord.id, '3');
+});
+
+test('updateSettings reloads and publishes persisted settings', () => {
+  const { dependencies, calls, persisted } = fakeDependencies({
+    words: [{ id: '1', word: 'tool' }]
+  });
+  dependencies.storage.saveSettings = (patch) => {
+    calls.settingsPatches.push({ ...patch });
+    persisted.settings = { mode: 'sequential', rate: 0.8 };
+    return { mode: patch.mode, rate: 99 };
+  };
+  const controller = createController(dependencies);
+  controller.initialize();
+
+  const settings = controller.updateSettings({ mode: 'sequential', rate: 0.81 });
+
+  assert.deepEqual(calls.settingsPatches, [{ mode: 'sequential', rate: 0.81 }]);
+  assert.deepEqual(settings, { mode: 'sequential', rate: 0.8 });
+  assert.deepEqual(controller.getState().settings, dependencies.storage.loadState().settings);
+  assert.deepEqual(calls.changes.at(-1).settings, { mode: 'sequential', rate: 0.8 });
 });

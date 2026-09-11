@@ -22,10 +22,9 @@ function initialState() {
 
 function copyRecord(value) {
   if (!value) return null;
-  return {
-    ...value,
-    warnings: Array.isArray(value.warnings) ? [...value.warnings] : value.warnings
-  };
+  const copy = { ...value };
+  if (Array.isArray(value.warnings)) copy.warnings = [...value.warnings];
+  return copy;
 }
 
 function createController({
@@ -50,6 +49,23 @@ function createController({
   function publish(patch) {
     state = { ...state, ...patch };
     onChange(snapshot());
+  }
+
+  function persistedStatePatch(preferredWordId, fallbackIndex = state.currentIndex) {
+    const loaded = storage.loadState();
+    const words = loaded.words.map(copyRecord);
+    let currentIndex = preferredWordId
+      ? words.findIndex((word) => word.id === preferredWordId)
+      : -1;
+    if (currentIndex === -1 && words.length) {
+      currentIndex = Math.min(Math.max(fallbackIndex, 0), words.length - 1);
+    }
+    return {
+      words,
+      settings: { ...loaded.settings },
+      currentIndex,
+      currentWord: currentIndex === -1 ? null : words[currentIndex]
+    };
   }
 
   function initialize() {
@@ -91,22 +107,28 @@ function createController({
     if (!draft || !String(draft.word || '').trim()) throw new Error('请输入有效单词');
 
     const saved = storage.saveWord(draft);
-    const words = state.words.map(copyRecord);
-    const matchingIndex = words.findIndex(
-      (word) => word.id === saved.id || word.word === saved.word
-    );
-    if (matchingIndex === -1) words.push(copyRecord(saved));
-    else words[matchingIndex] = copyRecord(saved);
-
-    const currentIndex = state.currentIndex === -1 ? 0 : state.currentIndex;
     publish({
-      words,
-      currentIndex,
-      currentWord: words[currentIndex] || null,
+      ...persistedStatePatch(state.currentWord && state.currentWord.id),
       draft: copyRecord(saved),
       lookupStatus: '已保存。'
     });
     return saved;
+  }
+
+  function deleteWord(id) {
+    const currentWordId = state.currentWord && state.currentWord.id;
+    const deleted = storage.deleteWord(id);
+    publish({
+      ...persistedStatePatch(currentWordId === id ? null : currentWordId),
+      answerVisible: false
+    });
+    return deleted;
+  }
+
+  function updateSettings(patch) {
+    storage.saveSettings(patch);
+    publish(persistedStatePatch(state.currentWord && state.currentWord.id));
+    return { ...state.settings };
   }
 
   function revealAnswer() {
@@ -144,6 +166,8 @@ function createController({
     initialize,
     lookupDraft,
     saveDraft,
+    deleteWord,
+    updateSettings,
     revealAnswer,
     moveNext,
     playCurrent,
