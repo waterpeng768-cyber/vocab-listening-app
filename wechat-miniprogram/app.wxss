@@ -1,0 +1,10 @@
+page {
+  box-sizing: border-box;
+}
+
+view,
+text,
+button,
+input {
+  box-sizing: inherit;
+}
