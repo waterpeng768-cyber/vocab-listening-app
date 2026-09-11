@@ -75,15 +75,18 @@ function parseDictionaryPayload(payload, word) {
     .filter((candidate) => candidate.type === 'phonetic')
     .map((candidate) => ({ value: candidate.value, region: candidate.region }));
   const selection = pickAmericanPhonetic(phoneticCandidates);
-  const selectedCandidate = candidates.find((candidate) => (
-    candidate.type === 'phonetic'
-    && normalizePhonetic(candidate.value) === selection.phonetic
-    && pickAmericanPhonetic([{ value: candidate.value, region: candidate.region }]).accent === selection.accent
-  ));
+  const selectedCandidate = selection.accent === 'us'
+    ? candidates.find((candidate) => (
+      candidate.type === 'phonetic'
+      && normalizePhonetic(candidate.value) === selection.phonetic
+      && pickAmericanPhonetic([{ value: candidate.value, region: candidate.region }]).accent === 'us'
+    ))
+    : null;
   const meaning = uniqueValues(candidates, 'meaning').join('；');
   const warnings = [];
 
   if (selection.accent === 'uk-only') warnings.push('仅找到英式音标，请手动核对美式音标');
+  if (selection.accent === 'generic') warnings.push('音标未标注地区，尚未确认是美式音标，请核对');
   if (selection.accent === 'missing') warnings.push('未找到美式音标，请手动填写');
   if (!meaning) warnings.push('未找到中文释义');
 

@@ -65,6 +65,18 @@ test('leaves UK-only phonetics blank instead of presenting them as American', ()
   assert.match(result.warnings.join(' '), /英式音标/);
 });
 
+test('keeps generic IPA but does not use its audio as American', () => {
+  const result = parseDictionaryPayload({
+    pronunciation: { text: '/tul/', audio: { url: 'https://audio.example/tool-generic.mp3' } },
+    translations: [{ language: 'zh-CN', text: '工具' }]
+  }, 'tool');
+
+  assert.equal(result.phonetic, '/tul/');
+  assert.notEqual(result.audioUrl, 'https://audio.example/tool-generic.mp3');
+  assert.match(result.audioUrl, /type=2/);
+  assert.match(result.warnings.join(' '), /未标注地区.*核对/);
+});
+
 test('returns verified dictionary meaning without calling machine translation', async () => {
   const urls = [];
   const fakeRequest = async ({ url }) => {
