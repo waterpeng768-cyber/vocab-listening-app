@@ -236,6 +236,29 @@ test('renames and deletes the current word through real storage without data los
   assert.deepEqual(storage.loadState().words.map((word) => word.word), ['refresh']);
 });
 
+test('keeps controller and real storage unchanged when a rename collides', () => {
+  const storage = createStorage(memoryStorage());
+  const original = storage.saveWord({ word: 'tool', meaning: '工具' });
+  const unrelated = storage.saveWord({ word: 'refresh', meaning: '刷新' });
+  const { dependencies } = fakeDependencies();
+  dependencies.storage = storage;
+  const controller = createController(dependencies);
+  controller.initialize();
+  const controllerBefore = controller.getState();
+  const storageBefore = storage.loadState();
+
+  assert.throws(
+    () => controller.saveDraft({ ...original, word: 'REFRESH', meaning: '冲突' }),
+    (error) => error.message === '词库中已存在这个单词'
+  );
+
+  assert.deepEqual(controller.getState().words, controllerBefore.words);
+  assert.equal(controller.getState().currentWord.id, original.id);
+  assert.equal(controller.getState().currentWord.word, 'tool');
+  assert.deepEqual(storage.loadState(), storageBefore);
+  assert.equal(storage.loadState().words.find((word) => word.id === unrelated.id).word, 'refresh');
+});
+
 test('deleteWord reloads storage and safely selects the word at the deleted position', () => {
   const words = [
     { id: '1', word: 'tool' },

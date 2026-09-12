@@ -59,6 +59,22 @@ test('renames an existing word by id without creating a duplicate id', () => {
   assert.equal(renamed.id, original.id);
 });
 
+test('rejects renaming an id onto a word owned by another id without writing', () => {
+  const memory = memoryStorage();
+  const service = createStorage(memory);
+  const original = service.saveWord({ word: 'tool', meaning: '工具' });
+  service.saveWord({ word: 'refresh', meaning: '刷新' });
+  const before = service.loadState();
+  const writesBeforeRename = memory.writes.length;
+
+  assert.throws(
+    () => service.saveWord({ ...original, word: ' Refresh ', meaning: '冲突' }),
+    (error) => error.message === '词库中已存在这个单词'
+  );
+  assert.equal(memory.writes.length, writesBeforeRename);
+  assert.deepEqual(service.loadState(), before);
+});
+
 test('rejects invalid backup without replacing current words', () => {
   const memory = memoryStorage();
   const service = createStorage(memory);

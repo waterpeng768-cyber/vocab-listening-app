@@ -68,8 +68,12 @@ function mergeWords(existingWords, incomingWords) {
 
 function saveWordByIdentity(existingWords, incoming) {
   const words = existingWords.map((word) => ({ ...word }));
-  let index = words.findIndex((word) => word.id === incoming.id);
-  if (index === -1) index = words.findIndex((word) => word.word === incoming.word);
+  const idIndex = words.findIndex((word) => word.id === incoming.id);
+  const wordIndex = words.findIndex((word) => word.word === incoming.word);
+  if (idIndex !== -1 && wordIndex !== -1 && idIndex !== wordIndex) {
+    throw new Error('词库中已存在这个单词');
+  }
+  const index = idIndex !== -1 ? idIndex : wordIndex;
 
   if (index === -1) {
     words.push({ ...incoming });
