@@ -13,3 +13,7 @@
 ## 说明
 
 自动查询会优先使用在线词典的美音音标和中文释义。如果中文意思来源不够确定，页面会提示你核对后再保存。
+
+## 微信小程序版本
+
+仓库中的 [`wechat-miniprogram`](wechat-miniprogram/) 是可导入微信开发者工具的原生微信小程序版本。导入、iPhone 预览、正式 AppID、合法域名、备份恢复及验收步骤请查看 [微信小程序使用说明](wechat-miniprogram/README.md)。
