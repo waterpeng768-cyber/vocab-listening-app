@@ -106,6 +106,7 @@ function createController({
     } catch (error) {
       const code = error && error.code;
       publish({
+        draft: copyRecord(editingDraft),
         lookupBusy: false,
         lookupStatus: LOOKUP_MESSAGES[code] || '查询失败，请重试或手动填写。'
       });

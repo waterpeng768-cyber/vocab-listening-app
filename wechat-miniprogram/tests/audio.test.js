@@ -42,6 +42,21 @@ test('rejects with a Chinese message when URL is empty', async () => {
   await assert.rejects(() => player.play('', 1), /没有可用的美音音频/);
 });
 
+test('empty URL cancels active playback before rejecting the new request', async () => {
+  const fakeWx = createFakeAudioWx();
+  const player = createAudioPlayer(fakeWx);
+  const active = player.play('https://audio.example/tool.mp3');
+  const activeCheck = assert.rejects(active, /已切换到新的单词/);
+
+  const emptyRequest = player.play('', 1);
+  const emptyCheck = assert.rejects(emptyRequest, /没有可用的美音音频/);
+
+  assert.equal(fakeWx.context.stopCalls, 2);
+  assert.equal(fakeWx.context.ended, null);
+  assert.equal(fakeWx.context.failed, null);
+  await Promise.all([activeCheck, emptyCheck]);
+});
+
 test('rejects playback errors and releases callbacks', async () => {
   const fakeWx = createFakeAudioWx();
   const player = createAudioPlayer(fakeWx);

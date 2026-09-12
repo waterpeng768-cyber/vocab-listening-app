@@ -13,10 +13,10 @@ function createAudioPlayer(wxApi) {
   }
 
   function play(url, rate = 1) {
-    if (!url) return Promise.reject(new Error('没有可用的美音音频'));
-
     cancelActive('已切换到新的单词');
     context.stop();
+    if (!url) return Promise.reject(new Error('没有可用的美音音频'));
+
     context.src = url;
     context.playbackRate = rate;
 

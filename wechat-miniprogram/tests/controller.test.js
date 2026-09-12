@@ -128,6 +128,30 @@ test('maps every lookup failure and preserves a manually editable draft', async 
   }
 });
 
+test('lookup failure publishes the passed editing draft instead of stale controller state', async () => {
+  const { dependencies } = fakeDependencies({
+    words: [{ id: 'word-1', word: 'tool', meaning: '工具' }],
+    lookupErrorCode: 'NOT_FOUND'
+  });
+  const controller = createController(dependencies);
+  controller.initialize();
+  controller.saveDraft({ id: 'word-1', word: 'tool', meaning: '旧释义' });
+  const editingDraft = {
+    id: 'word-1',
+    word: 'instrument',
+    phonetic: '',
+    meaning: '正在手动编辑',
+    warnings: ['保留这条提示']
+  };
+
+  assert.equal(await controller.lookupDraft('instrument', editingDraft), null);
+
+  const retained = controller.getState().draft;
+  assert.deepEqual(retained, editingDraft);
+  assert.notEqual(retained, editingDraft);
+  assert.notEqual(retained.warnings, editingDraft.warnings);
+});
+
 test('rejects an empty word but allows manually blank phonetic and meaning', () => {
   const { dependencies } = fakeDependencies();
   const controller = createController(dependencies);
