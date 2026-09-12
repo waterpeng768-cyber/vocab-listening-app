@@ -1,0 +1,132 @@
+<view class="page safe-bottom">
+  <view class="topbar">
+    <view>
+      <text class="eyebrow">VOCAB LISTENING</text>
+      <view class="title-row">
+        <text class="title">听音背单词</text>
+        <text class="word-count">{{wordCount}} 词</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="content">
+    <view class="segmented" role="tablist">
+      <button class="segment {{activeTab === 'review' ? 'is-active' : ''}}" data-tab="review" bindtap="switchTab">▶ 复习</button>
+      <button class="segment {{activeTab === 'library' ? 'is-active' : ''}}" data-tab="library" bindtap="switchTab">≡ 词库</button>
+    </view>
+
+    <view wx:if="{{activeTab === 'review'}}" class="section review-section">
+      <view wx:if="{{!currentWord}}" class="empty">
+        <text class="empty-mark">+</text>
+        <text class="empty-title">词库还是空的</text>
+        <text class="empty-copy">先添加一个单词，再开始听音复习。</text>
+        <button class="primary-button" data-tab="library" bindtap="switchTab">+ 去添加单词</button>
+      </view>
+
+      <view wx:else>
+        <view class="listen-panel">
+          <view class="listen-heading">
+            <text class="listen-mark">♪</text>
+            <view>
+              <text class="listen-label">听音辨词</text>
+              <text class="listen-state">{{audioStatus}}</text>
+            </view>
+          </view>
+
+          <view wx:if="{{answerVisible}}" class="answer">
+            <text class="word">{{currentWord.word}}</text>
+            <text class="phonetic" style="direction:ltr;text-align:left;unicode-bidi:isolate">{{currentWord.phonetic || '暂无音标'}}</text>
+            <text class="meaning">{{currentWord.meaning || '暂无释义'}}</text>
+          </view>
+          <view wx:else class="answer answer-hidden">
+            <text class="question-mark">?</text>
+            <text>先听声音，再显示答案</text>
+          </view>
+
+          <view class="review-actions">
+            <button class="primary-button" bindtap="onPlay" loading="{{audioBusy}}" disabled="{{audioBusy}}">▶ 播放美音</button>
+            <button class="secondary-button" bindtap="onReveal" disabled="{{answerVisible}}">◉ 显示答案</button>
+            <button class="secondary-button" bindtap="onNext">→ 下一个</button>
+          </view>
+        </view>
+
+        <view class="settings-band">
+          <view class="setting-group">
+            <text class="setting-label">复习顺序</text>
+            <view class="choice-row">
+              <button class="choice {{mode === 'random' ? 'is-selected' : ''}}" data-mode="random" bindtap="onModeChange">※ 随机</button>
+              <button class="choice {{mode === 'sequential' ? 'is-selected' : ''}}" data-mode="sequential" bindtap="onModeChange">→ 顺序</button>
+            </view>
+          </view>
+          <view class="setting-group">
+            <text class="setting-label">播放语速</text>
+            <view class="choice-row rate-row">
+              <button wx:for="{{rateOptions}}" wx:key="*this" class="choice rate-choice {{rate === item ? 'is-selected' : ''}}" data-rate="{{item}}" bindtap="onRateChange">{{item}}x</button>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{activeTab === 'library'}}" class="section library-section">
+      <view class="form-section">
+        <view class="section-heading">
+          <text class="section-title">添加或编辑</text>
+          <text wx:if="{{draft.id}}" class="editing-label">编辑中</text>
+        </view>
+
+        <label class="field-label">英语单词</label>
+        <view class="lookup-row">
+          <input class="text-input" value="{{draft.word}}" data-field="word" bindinput="onDraftInput" placeholder="输入英语单词" maxlength="80" />
+          <button class="lookup-button" bindtap="onLookup" loading="{{lookupBusy}}" disabled="{{lookupBusy}}">+ 自动查询</button>
+        </view>
+        <text wx:if="{{lookupStatus}}" class="status-text">{{lookupStatus}}</text>
+        <text class="manual-note">查询失败时仍可手动填写下方音标和中文释义，然后直接保存。</text>
+
+        <label class="field-label">美式音标</label>
+        <input class="text-input phonetic" style="direction:ltr;text-align:left;unicode-bidi:isolate" value="{{draft.phonetic}}" data-field="phonetic" bindinput="onDraftInput" placeholder="例如 /tuːl/" maxlength="120" />
+
+        <label class="field-label">中文释义</label>
+        <textarea class="text-area" value="{{draft.meaning}}" data-field="meaning" bindinput="onDraftInput" placeholder="输入中文释义" maxlength="500" />
+
+        <label class="field-label">美音地址</label>
+        <input class="text-input" value="{{draft.audioUrl}}" data-field="audioUrl" bindinput="onDraftInput" placeholder="可手动填写音频 URL" maxlength="1000" />
+
+        <view wx:if="{{draft.warnings.length}}" class="warning-list">
+          <text wx:for="{{draft.warnings}}" wx:key="*this" class="warning-item">! {{item}}</text>
+        </view>
+        <text class="source-note">查询结果可能来自 Free Dictionary API 与机器翻译，保存前请核对美式音标和释义。</text>
+        <button class="primary-button save-button" bindtap="onSave">✓ 保存到词库</button>
+      </view>
+
+      <view class="library-list-section">
+        <view class="section-heading">
+          <text class="section-title">我的词库</text>
+          <text class="result-count">{{filteredWords.length}} 项</text>
+        </view>
+        <input class="text-input search-input" value="{{searchQuery}}" bindinput="onSearchInput" placeholder="搜索单词、音标或释义" />
+
+        <view wx:if="{{!filteredWords.length}}" class="list-empty">没有匹配的单词</view>
+        <view wx:for="{{filteredWords}}" wx:key="id" class="word-card">
+          <view class="word-card-main">
+            <text class="card-word">{{item.word}}</text>
+            <text class="phonetic card-phonetic" style="direction:ltr;text-align:left;unicode-bidi:isolate">{{item.phonetic || '暂无音标'}}</text>
+            <text class="card-meaning">{{item.meaning || '暂无释义'}}</text>
+          </view>
+          <view class="card-actions">
+            <button class="icon-text-button" data-id="{{item.id}}" bindtap="onEdit">✎ 编辑</button>
+            <button class="icon-text-button danger-button" data-id="{{item.id}}" bindtap="onDelete">× 删除</button>
+          </view>
+        </view>
+      </view>
+
+      <view class="backup-section">
+        <text class="section-title">词库备份</text>
+        <button class="secondary-button backup-button" bindtap="onCopyBackup">□ 复制备份</button>
+        <textarea class="backup-area" value="{{backupText}}" bindinput="onBackupInput" placeholder="在这里粘贴备份内容" maxlength="-1" />
+        <button class="secondary-button backup-button" bindtap="onImportBackup">↓ 粘贴导入</button>
+        <button class="danger-clear-button" bindtap="onClearAll">× 清空全部单词</button>
+      </view>
+    </view>
+  </view>
+</view>

@@ -5,6 +5,13 @@ page {
 view,
 text,
 button,
-input {
+input,
+textarea {
   box-sizing: inherit;
+}
+
+button,
+input,
+textarea {
+  letter-spacing: 0;
 }
