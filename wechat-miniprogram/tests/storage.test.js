@@ -39,6 +39,26 @@ test('updates a duplicate word instead of adding another row', () => {
   assert.equal(updated.createdAt, original.createdAt);
 });
 
+test('renames an existing word by id without creating a duplicate id', () => {
+  const service = createStorage(memoryStorage());
+  const original = service.saveWord({ word: 'tool', meaning: '工具' });
+
+  const renamed = service.saveWord({
+    id: original.id,
+    word: 'instrument',
+    meaning: '器具',
+    createdAt: original.createdAt,
+    updatedAt: original.updatedAt + 1
+  });
+
+  const state = service.loadState();
+  assert.equal(state.words.length, 1);
+  assert.equal(state.words[0].word, 'instrument');
+  assert.equal(state.words[0].id, original.id);
+  assert.equal(state.words[0].createdAt, original.createdAt);
+  assert.equal(renamed.id, original.id);
+});
+
 test('rejects invalid backup without replacing current words', () => {
   const memory = memoryStorage();
   const service = createStorage(memory);

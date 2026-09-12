@@ -66,6 +66,26 @@ function mergeWords(existingWords, incomingWords) {
   return merged;
 }
 
+function saveWordByIdentity(existingWords, incoming) {
+  const words = existingWords.map((word) => ({ ...word }));
+  let index = words.findIndex((word) => word.id === incoming.id);
+  if (index === -1) index = words.findIndex((word) => word.word === incoming.word);
+
+  if (index === -1) {
+    words.push({ ...incoming });
+    return { words, saved: words[words.length - 1] };
+  }
+
+  const existing = words[index];
+  words[index] = {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    createdAt: existing.createdAt
+  };
+  return { words, saved: words[index] };
+}
+
 function sanitizeState(value) {
   const state = value && typeof value === 'object' ? value : {};
   const rows = Array.isArray(state.words) ? state.words : [];
@@ -121,9 +141,9 @@ function createStorage(wxStorage) {
     const word = sanitizeWord(input);
     if (!word) throw new Error('请输入有效单词');
     const state = readState();
-    const words = mergeWords(state.words, [word]);
+    const { words, saved } = saveWordByIdentity(state.words, word);
     writeState({ ...state, words });
-    return words.find((item) => item.word === word.word);
+    return saved;
   }
 
   function deleteWord(id) {

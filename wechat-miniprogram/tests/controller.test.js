@@ -1,6 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createController } = require('../pages/index/controller');
+const { createStorage } = require('../utils/storage');
+
+function memoryStorage() {
+  const values = {};
+  return {
+    getStorageSync(key) { return values[key]; },
+    setStorageSync(key, value) { values[key] = value; },
+    removeStorageSync(key) { delete values[key]; }
+  };
+}
 
 function fakeDependencies(options = {}) {
   const persisted = {
@@ -203,15 +213,27 @@ test('getState protects lookup warnings from consumer mutation', async () => {
   assert.deepEqual(controller.getState().draft.warnings, []);
 });
 
-test('saveDraft reloads persisted words after editing an id to a new word', () => {
-  const { dependencies } = fakeDependencies({ words: [{ id: '1', word: 'tool' }] });
+test('renames and deletes the current word through real storage without data loss', () => {
+  const storage = createStorage(memoryStorage());
+  const original = storage.saveWord({ word: 'tool', meaning: '工具' });
+  const unrelated = storage.saveWord({ word: 'refresh', meaning: '刷新' });
+  const { dependencies } = fakeDependencies();
+  dependencies.storage = storage;
   const controller = createController(dependencies);
   controller.initialize();
 
-  controller.saveDraft({ id: '1', word: 'instrument', phonetic: '', meaning: '工具' });
+  controller.saveDraft({ ...original, word: 'instrument', meaning: '器具' });
 
   assert.deepEqual(controller.getState().words, dependencies.storage.loadState().words);
-  assert.deepEqual(controller.getState().words.map((word) => word.word), ['tool', 'instrument']);
+  assert.deepEqual(controller.getState().words.map((word) => word.word), ['instrument', 'refresh']);
+  assert.equal(new Set(controller.getState().words.map((word) => word.id)).size, 2);
+  assert.equal(controller.getState().currentWord.id, original.id);
+  assert.equal(controller.getState().currentWord.word, 'instrument');
+
+  assert.equal(controller.deleteWord(original.id), true);
+  assert.deepEqual(controller.getState().words.map((word) => word.word), ['refresh']);
+  assert.equal(controller.getState().currentWord.id, unrelated.id);
+  assert.deepEqual(storage.loadState().words.map((word) => word.word), ['refresh']);
 });
 
 test('deleteWord reloads storage and safely selects the word at the deleted position', () => {
