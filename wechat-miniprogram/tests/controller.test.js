@@ -20,6 +20,7 @@ function fakeDependencies(options = {}) {
   };
   const calls = {
     audioPlay: [],
+    audioStop: 0,
     audioDestroy: 0,
     changes: [],
     deletedIds: [],
@@ -68,6 +69,7 @@ function fakeDependencies(options = {}) {
         calls.audioPlay.push({ url, rate });
         if (options.audioFails) throw new Error('播放失败');
       },
+      stop: () => { calls.audioStop += 1; },
       destroy: () => { calls.audioDestroy += 1; }
     },
     randomFn: () => 0,
@@ -103,6 +105,7 @@ test('audio failure keeps the same word and clears busy state', async () => {
   await assert.rejects(() => controller.playCurrent());
   assert.equal(controller.getState().currentWord.id, '1');
   assert.equal(controller.getState().audioBusy, false);
+  assert.match(controller.getState().audioStatus, /播放失败.*重试/);
 });
 
 test('maps every lookup failure and preserves a manually editable draft', async () => {
@@ -152,6 +155,82 @@ test('moves sequentially, wraps, and hides the next answer', () => {
   assert.equal(controller.moveNext().id, '2');
   assert.equal(controller.getState().answerVisible, false);
   assert.equal(controller.moveNext().id, '1');
+});
+
+test('moving next cancels in-flight audio before selecting another word', async () => {
+  const { dependencies, calls } = fakeDependencies({
+    words: [
+      { id: '1', word: 'tool', audioUrl: 'https://audio.example/tool.mp3' },
+      { id: '2', word: 'refresh', audioUrl: 'https://audio.example/refresh.mp3' }
+    ]
+  });
+  let rejectPlayback;
+  dependencies.audio.play = () => new Promise((resolve, reject) => { rejectPlayback = reject; });
+  dependencies.audio.stop = () => {
+    calls.audioStop += 1;
+    const error = Object.assign(new Error('播放已停止'), { code: 'PLAYBACK_CANCELLED' });
+    rejectPlayback(error);
+  };
+  const controller = createController(dependencies);
+  controller.initialize();
+  const playback = controller.playCurrent();
+
+  controller.moveNext();
+
+  await assert.rejects(playback, (error) => error.code === 'PLAYBACK_CANCELLED');
+  assert.equal(calls.audioStop, 1);
+  assert.equal(controller.getState().currentWord.id, '2');
+  assert.equal(controller.getState().audioBusy, false);
+});
+
+test('plays a selected vocabulary row without changing the review word', async () => {
+  const words = [
+    { id: '1', word: 'tool', audioUrl: 'https://audio.example/tool.mp3' },
+    { id: '2', word: 'refresh', audioUrl: 'https://audio.example/refresh.mp3' }
+  ];
+  const { dependencies, calls } = fakeDependencies({ words });
+  const controller = createController(dependencies);
+  controller.initialize();
+
+  await controller.playWord('2');
+
+  assert.deepEqual(calls.audioPlay, [{ url: words[1].audioUrl, rate: 1 }]);
+  assert.equal(controller.getState().currentWord.id, '1');
+  assert.equal(controller.getState().audioStatus, '播放完成');
+});
+
+test('lookup while editing preserves identity across a spelling change', async () => {
+  const storage = createStorage(memoryStorage());
+  const original = storage.saveWord({ word: 'tool', meaning: '工具' });
+  const { dependencies } = fakeDependencies();
+  dependencies.storage = storage;
+  dependencies.lookup = async (word) => ({
+    word,
+    phonetic: '/ˈɪnstrəmənt/',
+    meaning: '器具',
+    confidence: 'verified',
+    warnings: []
+  });
+  const controller = createController(dependencies);
+  controller.initialize();
+
+  const result = await controller.lookupDraft('instrument', { ...original, word: 'instrument' });
+  controller.saveDraft(result);
+
+  const words = storage.loadState().words;
+  assert.equal(result.id, original.id);
+  assert.equal(words.length, 1);
+  assert.equal(words[0].id, original.id);
+  assert.equal(words[0].word, 'instrument');
+});
+
+test('rejects malformed English input before lookup and save', async () => {
+  const { dependencies, calls } = fakeDependencies();
+  const controller = createController(dependencies);
+
+  await assert.rejects(() => controller.lookupDraft('to2ol'), /只支持英文字母/);
+  assert.throws(() => controller.saveDraft({ word: '-tool' }), /连字符或撇号/);
+  assert.equal(calls.changes.length, 0);
 });
 
 test('plays the current audio at the saved rate and publishes fresh snapshots', async () => {

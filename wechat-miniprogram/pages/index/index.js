@@ -1,5 +1,11 @@
 const { createController } = require('./controller');
-const { blankDraft, filterWords, pageStateFromController, updateDraftField } = require('./page-helpers');
+const {
+  blankDraft,
+  filterWords,
+  pageStateFromController,
+  updateDraftField,
+  validateEnglishWord
+} = require('./page-helpers');
 const { createAudioPlayer } = require('../../services/audio');
 const { lookupWord } = require('../../services/dictionary');
 const { createRequestJson } = require('../../services/request');
@@ -21,6 +27,7 @@ Page({
     answerVisible: false,
     audioBusy: false,
     audioStatus: '准备好后点击播放',
+    playingWordId: null,
     lookupBusy: false,
     lookupStatus: '',
     mode: 'random',
@@ -79,15 +86,18 @@ Page({
 
   async onLookup() {
     const word = String(this.data.draft.word || '').trim();
-    if (!word) {
-      wx.showToast({ title: '请先输入英语单词', icon: 'none' });
+    const validationMessage = validateEnglishWord(word);
+    if (validationMessage) {
+      wx.showToast({ title: validationMessage, icon: 'none' });
       return;
     }
-    await this.controller.lookupDraft(word);
+    await this.controller.lookupDraft(word, this.data.draft);
   },
 
   onSave() {
     try {
+      const validationMessage = validateEnglishWord(this.data.draft.word);
+      if (validationMessage) throw new Error(validationMessage);
       const saved = this.controller.saveDraft(this.data.draft);
       this.setData({ draft: { ...saved, warnings: saved.warnings || [] } });
       wx.showToast({ title: '已保存到词库', icon: 'success' });
@@ -128,6 +138,16 @@ Page({
     try {
       await this.controller.playCurrent();
     } catch (error) {
+      if (error && error.code === 'PLAYBACK_CANCELLED') return;
+      wx.showToast({ title: messageOf(error, '播放失败，请重试'), icon: 'none' });
+    }
+  },
+
+  async onPlayWord(event) {
+    try {
+      await this.controller.playWord(event.currentTarget.dataset.id);
+    } catch (error) {
+      if (error && error.code === 'PLAYBACK_CANCELLED') return;
       wx.showToast({ title: messageOf(error, '播放失败，请重试'), icon: 'none' });
     }
   },

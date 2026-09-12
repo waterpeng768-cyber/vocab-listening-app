@@ -1,5 +1,15 @@
 const DRAFT_FIELDS = new Set(['word', 'phonetic', 'meaning', 'audioUrl']);
 
+function validateEnglishWord(value) {
+  const word = String(value || '').trim();
+  if (!word) return '请输入有效单词（仅限英语）';
+  if (/[^A-Za-z'-]/.test(word)) return '只支持英文字母，以及单词内部的连字符或撇号';
+  if (!/^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(word)) {
+    return '连字符或撇号只能出现在字母之间';
+  }
+  return '';
+}
+
 function blankDraft() {
   return {
     word: '',
@@ -29,7 +39,8 @@ function pageStateFromController(state) {
     lookupBusy: Boolean(state.lookupBusy),
     lookupStatus: state.lookupStatus || '',
     audioBusy: Boolean(state.audioBusy),
-    audioStatus: state.audioBusy ? '正在播放美音...' : '准备好后点击播放',
+    audioStatus: state.audioStatus || (state.audioBusy ? '正在播放美音...' : '准备好后点击播放'),
+    playingWordId: state.playingWordId || null,
     mode: settings.mode === 'sequential' ? 'sequential' : 'random',
     rate: Number(settings.rate) || 1
   };
@@ -52,4 +63,10 @@ function filterWords(words, query) {
     .some((value) => String(value || '').toLocaleLowerCase().includes(needle)));
 }
 
-module.exports = { blankDraft, filterWords, pageStateFromController, updateDraftField };
+module.exports = {
+  blankDraft,
+  filterWords,
+  pageStateFromController,
+  updateDraftField,
+  validateEnglishWord
+};

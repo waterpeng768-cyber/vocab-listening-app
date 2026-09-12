@@ -1,4 +1,5 @@
 const { nextReviewIndex } = require('../../utils/review');
+const { validateEnglishWord } = require('./page-helpers');
 
 const LOOKUP_MESSAGES = {
   DOMAIN_NOT_ALLOWED: '微信尚未允许访问词典域名，请先配置合法域名；你也可以手动填写。',
@@ -16,7 +17,9 @@ function initialState() {
     draft: null,
     lookupBusy: false,
     lookupStatus: '',
-    audioBusy: false
+    audioBusy: false,
+    audioStatus: '准备好后点击播放',
+    playingWordId: null
   };
 }
 
@@ -35,6 +38,7 @@ function createController({
   onChange = () => {}
 }) {
   let state = initialState();
+  let playbackVersion = 0;
 
   function snapshot() {
     return {
@@ -81,18 +85,24 @@ function createController({
     return snapshot();
   }
 
-  async function lookupDraft(word) {
+  async function lookupDraft(word, editingDraft = state.draft) {
+    const validationMessage = validateEnglishWord(word);
+    if (validationMessage) throw new Error(validationMessage);
     publish({ lookupBusy: true, lookupStatus: '正在查询...' });
     try {
       const result = await lookup(word);
+      const identity = editingDraft && editingDraft.id
+        ? { id: editingDraft.id, createdAt: editingDraft.createdAt }
+        : {};
+      const draft = { ...result, ...identity };
       publish({
-        draft: copyRecord(result),
+        draft: copyRecord(draft),
         lookupBusy: false,
         lookupStatus: result.confidence === 'verified'
           ? '已找到，请核对后保存。'
           : '结果需要核对后再保存。'
       });
-      return result;
+      return draft;
     } catch (error) {
       const code = error && error.code;
       publish({
@@ -104,7 +114,8 @@ function createController({
   }
 
   function saveDraft(draft) {
-    if (!draft || !String(draft.word || '').trim()) throw new Error('请输入有效单词');
+    const validationMessage = validateEnglishWord(draft && draft.word);
+    if (validationMessage) throw new Error(validationMessage);
 
     const saved = storage.saveWord(draft);
     publish({
@@ -136,30 +147,58 @@ function createController({
   }
 
   function moveNext() {
+    playbackVersion += 1;
+    audio.stop();
     const mode = state.settings.mode === 'sequential' ? 'ordered' : state.settings.mode;
     const currentIndex = nextReviewIndex(state.words, state.currentIndex, mode, randomFn);
     publish({
       currentIndex,
       currentWord: currentIndex === -1 ? null : state.words[currentIndex],
-      answerVisible: false
+      answerVisible: false,
+      audioBusy: false,
+      audioStatus: '准备好后点击播放',
+      playingWordId: null
     });
     return state.currentWord;
   }
 
-  async function playCurrent() {
-    if (!state.currentWord) throw new Error('当前没有可播放的单词');
+  async function playWord(id) {
+    const word = state.words.find((item) => item.id === id);
+    if (!word) throw new Error('没有找到要播放的单词');
+    const version = ++playbackVersion;
 
-    publish({ audioBusy: true });
+    publish({
+      audioBusy: true,
+      audioStatus: '正在播放美音...',
+      playingWordId: word.id
+    });
     try {
-      await audio.play(state.currentWord.audioUrl, state.settings.rate);
-    } finally {
-      publish({ audioBusy: false });
+      await audio.play(word.audioUrl, state.settings.rate);
+      if (version === playbackVersion) {
+        publish({ audioBusy: false, audioStatus: '播放完成', playingWordId: null });
+      }
+    } catch (error) {
+      if (version === playbackVersion) {
+        const message = error && error.message ? error.message : '美音播放失败';
+        publish({
+          audioBusy: false,
+          audioStatus: `${message}，请重试`,
+          playingWordId: null
+        });
+      }
+      throw error;
     }
   }
 
+  function playCurrent() {
+    if (!state.currentWord) return Promise.reject(new Error('当前没有可播放的单词'));
+    return playWord(state.currentWord.id);
+  }
+
   function destroy() {
+    playbackVersion += 1;
     audio.destroy();
-    publish({ audioBusy: false });
+    publish({ audioBusy: false, playingWordId: null });
   }
 
   return {
@@ -170,6 +209,7 @@ function createController({
     updateSettings,
     revealAnswer,
     moveNext,
+    playWord,
     playCurrent,
     destroy,
     getState: snapshot

@@ -7,7 +7,9 @@ function createAudioPlayer(wxApi) {
     const playback = activePlayback;
     activePlayback = null;
     playback.cleanup();
-    playback.reject(new Error(message));
+    const error = new Error(message);
+    error.code = 'PLAYBACK_CANCELLED';
+    playback.reject(error);
   }
 
   function play(url, rate = 1) {

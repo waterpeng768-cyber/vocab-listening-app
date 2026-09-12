@@ -424,6 +424,10 @@ button.rate-choice {
   margin-bottom: 18rpx;
 }
 
+.library-playback-status {
+  margin: 0 0 18rpx;
+}
+
 .list-empty {
   padding: 48rpx 20rpx;
   color: #65717e;
@@ -473,6 +477,7 @@ button.rate-choice {
 
 .card-actions {
   align-self: center;
+  flex-direction: column;
   gap: 6rpx;
 }
 

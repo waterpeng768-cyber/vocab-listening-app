@@ -11,7 +11,7 @@ test('binds every required vocabulary and review action', () => {
   const handlers = [
     'switchTab', 'onLookup', 'onSave', 'onEdit', 'onDelete', 'onPlay',
     'onReveal', 'onNext', 'onModeChange', 'onRateChange', 'onCopyBackup',
-    'onImportBackup', 'onClearAll'
+    'onImportBackup', 'onClearAll', 'onPlayWord'
   ];
 
   for (const handler of handlers) {
@@ -25,4 +25,5 @@ test('keeps answer IPA left-to-right and provides manual lookup fallback', () =>
 
   assert.match(template, /class="phonetic"[^>]*direction:ltr/);
   assert.match(template, /查询失败[^<]*手动填写/);
+  assert.match(template, /class="status-text library-playback-status"/);
 });

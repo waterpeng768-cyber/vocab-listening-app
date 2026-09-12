@@ -105,6 +105,7 @@
           <text class="result-count">{{filteredWords.length}} 项</text>
         </view>
         <input class="text-input search-input" value="{{searchQuery}}" bindinput="onSearchInput" placeholder="搜索单词、音标或释义" />
+        <text wx:if="{{audioStatus !== '准备好后点击播放'}}" class="status-text library-playback-status">{{audioStatus}}</text>
 
         <view wx:if="{{!filteredWords.length}}" class="list-empty">没有匹配的单词</view>
         <view wx:for="{{filteredWords}}" wx:key="id" class="word-card">
@@ -114,6 +115,7 @@
             <text class="card-meaning">{{item.meaning || '暂无释义'}}</text>
           </view>
           <view class="card-actions">
+            <button class="icon-text-button play-row-button" data-id="{{item.id}}" bindtap="onPlayWord" loading="{{audioBusy && playingWordId === item.id}}">▷ 播放</button>
             <button class="icon-text-button" data-id="{{item.id}}" bindtap="onEdit">✎ 编辑</button>
             <button class="icon-text-button danger-button" data-id="{{item.id}}" bindtap="onDelete">× 删除</button>
           </view>
