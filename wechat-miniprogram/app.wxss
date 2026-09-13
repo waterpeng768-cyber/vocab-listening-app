@@ -1,0 +1,17 @@
+page {
+  box-sizing: border-box;
+}
+
+view,
+text,
+button,
+input,
+textarea {
+  box-sizing: inherit;
+}
+
+button,
+input,
+textarea {
+  letter-spacing: 0;
+}
