@@ -5,8 +5,12 @@ Date: 2026-09-13
 ## Scope
 
 Completed the whole-branch final fixes from head `d4afdbd` without pushing or merging.
-The implementation is committed as `6854d1006f807e473f7af693439240466a92339f`
-(`fix: harden vocabulary persistence and lookup`).
+The implementation commits are:
+
+- `6854d1006f807e473f7af693439240466a92339f`
+  (`fix: harden vocabulary persistence and lookup`)
+- `62a4d24232f503015aa00d8a9c18dfa511633524`
+  (`fix: reject untrusted generic audio labels`)
 
 ## Fixes
 
@@ -26,6 +30,11 @@ The implementation is committed as `6854d1006f807e473f7af693439240466a92339f`
    entries are ignored, and cache failures cannot block a live lookup.
 6. Added explicit protection that a valid empty current word array is
    authoritative over legacy storage.
+7. Corrected generic-IPA audio trust at both persistence and cache boundaries.
+   A caller-supplied `audioAccent: "us"` cannot authorize an arbitrary URL.
+   Generic IPA retains audio only when the URL exactly matches the configured
+   Youdao `type=2` fallback for the same normalized word. Poisoned cache entries
+   are ignored and replaced by a fresh provider result.
 
 The existing `tool` `/tul/` and Chinese-meaning regression, American-only audio
 selection, hidden-answer workflow, manual fallback, rename collision behavior,
@@ -40,9 +49,13 @@ and single audio-context tests remain in the passing suite.
   storage rates, and the unversioned cache.
 - Additional RED: the old generic candidate-audio regression failed `0/1`
   because the URL was still retained.
+- Scoped correction RED: `0/2` tests passed. Persistence retained an arbitrary
+  generic URL carrying a fake `us` flag, and cached lookup returned the same
+  poisoned entry instead of calling the provider.
+- Scoped correction focused GREEN: `31/31` storage and dictionary tests passed.
 - Focused GREEN: `48/48` storage, dictionary, page-helper, page-handler, and
   review tests passed.
-- Final full GREEN: `83/83` tests passed with no failures, skips, or todos.
+- Final full GREEN: `85/85` tests passed with no failures, skips, or todos.
 
 ## Changed Files
 
@@ -59,7 +72,7 @@ and single audio-context tests remain in the passing suite.
 
 ## Verification
 
-- Node tests: `83/83` passed.
+- Node tests: `85/85` passed.
 - JavaScript syntax: `21` files passed `node --check`.
 - JSON parse: `5` files passed.
 - Empty-file scan: no empty files in `wechat-miniprogram/`.
@@ -72,9 +85,9 @@ and single audio-context tests remain in the passing suite.
 ## ZIP
 
 - Path: `C:\Users\pengs\Documents\Codex\2026-06-24\vocab-listening-wechat-miniprogram.zip`
-- Size: `37,411` bytes
+- Size: `37,942` bytes
 - Files: `30`
-- SHA-256: `bc44e9dfc09be4ebe9b67466abd935c6c466ddc1d9d4a79f6961596fe28ecfa4`
+- SHA-256: `dd6d964a42406d87d71ed90eb2f6b1600a38f00e3e5641a07194a945ebb0afd8`
 - Verification: every ZIP file entry matched its source file by SHA-256.
 
 No push or merge was performed.
