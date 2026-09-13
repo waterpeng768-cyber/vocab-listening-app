@@ -97,6 +97,8 @@ function parseDictionaryPayload(payload, word) {
     audioUrl: selectedCandidate && selectedCandidate.audioUrl
       ? selectedCandidate.audioUrl
       : americanTtsUrl(normalizedWord),
+    accent: selection.accent,
+    audioAccent: 'us',
     source: 'freedictionaryapi',
     confidence: meaning ? 'verified' : 'review',
     warnings
@@ -127,10 +129,32 @@ async function lookupWord(word, request) {
     phonetic: dictionaryResult.phonetic,
     meaning: translatedText,
     audioUrl: dictionaryResult.audioUrl,
+    accent: dictionaryResult.accent,
+    audioAccent: dictionaryResult.audioAccent,
     source: 'mymemory',
     confidence: 'review',
     warnings
   };
 }
 
-module.exports = { collectCandidates, parseDictionaryPayload, lookupWord };
+function createCachedLookup(storage, lookup) {
+  return async function cachedLookup(word) {
+    const normalizedWord = normalizeWord(word);
+    try {
+      const cached = storage.readLookupCache(normalizedWord);
+      if (cached) return cached;
+    } catch (_) {
+      // Cache failures must not block a live dictionary lookup.
+    }
+
+    const result = await lookup(normalizedWord);
+    try {
+      storage.writeLookupCache(normalizedWord, result);
+    } catch (_) {
+      // The fresh result remains usable when local storage is unavailable.
+    }
+    return result;
+  };
+}
+
+module.exports = { collectCandidates, createCachedLookup, parseDictionaryPayload, lookupWord };

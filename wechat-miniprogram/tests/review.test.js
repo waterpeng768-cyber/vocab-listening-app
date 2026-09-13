@@ -12,7 +12,14 @@ test('random mode avoids the current item when alternatives exist', () => {
   assert.equal(nextReviewIndex(['a'], 0, 'random', () => 0), 0);
 });
 
-test('rate remains within the supported range', () => {
+test('empty vocabulary has no review index', () => {
+  assert.equal(nextReviewIndex([], 0, 'ordered', () => 0), -1);
+});
+
+test('rate uses only the four visible supported choices', () => {
+  for (const rate of [0.6, 0.8, 1, 1.2]) assert.equal(clampRate(rate), rate);
   assert.equal(clampRate(0.2), 0.6);
   assert.equal(clampRate(2), 1.2);
+  assert.equal(clampRate(0.69), 0.6);
+  assert.equal(clampRate(0.71), 0.8);
 });

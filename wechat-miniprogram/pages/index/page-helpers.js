@@ -16,6 +16,8 @@ function blankDraft() {
     phonetic: '',
     meaning: '',
     audioUrl: '',
+    accent: 'manual',
+    audioAccent: '',
     source: 'manual',
     confidence: 'manual',
     warnings: []
@@ -51,7 +53,14 @@ function pageStateFromController(state) {
 
 function updateDraftField(draft, field, value) {
   if (!DRAFT_FIELDS.has(field)) return draft;
-  return { ...draft, [field]: value };
+  const updated = copyDraft({ ...draft, [field]: value });
+  if ((field === 'phonetic' || field === 'meaning') && value !== draft[field]) {
+    updated.source = 'manual';
+    updated.confidence = 'manual';
+    if (field === 'phonetic') updated.accent = 'manual';
+  }
+  if (field === 'audioUrl' && value !== draft[field]) updated.audioAccent = value ? 'us' : '';
+  return updated;
 }
 
 function filterWords(words, query) {

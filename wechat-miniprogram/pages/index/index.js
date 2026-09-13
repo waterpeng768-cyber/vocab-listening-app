@@ -7,11 +7,11 @@ const {
   validateEnglishWord
 } = require('./page-helpers');
 const { createAudioPlayer } = require('../../services/audio');
-const { lookupWord } = require('../../services/dictionary');
+const { createCachedLookup, lookupWord } = require('../../services/dictionary');
 const { createRequestJson } = require('../../services/request');
 const { createStorage } = require('../../utils/storage');
 
-const RATE_OPTIONS = [0.7, 0.8, 1, 1.2];
+const RATE_OPTIONS = [0.6, 0.8, 1, 1.2];
 
 function messageOf(error, fallback) {
   return error && error.message ? error.message : fallback;
@@ -42,9 +42,13 @@ Page({
     this.storage = createStorage(wx);
     const request = createRequestJson(wx);
     const audio = createAudioPlayer(wx);
+    const lookup = createCachedLookup(
+      this.storage,
+      (word) => lookupWord(word, request)
+    );
     this.controller = createController({
       storage: this.storage,
-      lookup: (word) => lookupWord(word, request),
+      lookup,
       audio,
       onChange: (state) => this.applyControllerState(state)
     });

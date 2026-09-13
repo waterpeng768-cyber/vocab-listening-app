@@ -92,3 +92,46 @@ test('row play handler requests audio for that vocabulary id', async () => {
 
   assert.deepEqual(calls, ['word-2']);
 });
+
+test('shows exactly the four supported playback rates', () => {
+  const page = pageHarness();
+  assert.deepEqual(page.data.rateOptions, [0.6, 0.8, 1, 1.2]);
+});
+
+test('normal page lookup writes and then reuses the versioned cache', async (t) => {
+  const previousWx = global.wx;
+  t.after(() => { global.wx = previousWx; });
+  const values = {};
+  let requestCount = 0;
+  const audioContext = {
+    stop() {}, play() {}, destroy() {},
+    onEnded() {}, onError() {}, offEnded() {}, offError() {}
+  };
+  global.wx = {
+    getStorageSync: (key) => values[key],
+    setStorageSync: (key, value) => { values[key] = value; },
+    createInnerAudioContext: () => audioContext,
+    request(options) {
+      requestCount += 1;
+      options.success({
+        statusCode: 200,
+        data: {
+          entries: [{
+            pronunciations: [{ transcription: '/tul/', tags: ['US'] }],
+            translations: [{ language: 'zh-CN', text: '工具' }]
+          }]
+        }
+      });
+    }
+  };
+  const page = pageHarness({ data: { draft: { word: 'tool' } } });
+  page.onLoad();
+
+  await page.onLookup();
+  await page.onLookup();
+
+  assert.equal(requestCount, 1);
+  assert.equal(values['vocab-listening-lookup-cache-v1'].version, 1);
+  assert.equal(values['vocab-listening-lookup-cache-v1'].entries.tool.word, 'tool');
+  page.onUnload();
+});

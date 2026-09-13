@@ -1,9 +1,12 @@
 const { normalizeWord, normalizePhonetic } = require('./phonetics');
+const { clampRate } = require('./review');
 
 const STATE_KEY = 'vocab-listening-state-v1';
 const CACHE_KEY = 'vocab-listening-lookup-cache-v1';
+const CACHE_VERSION = 1;
 const LEGACY_KEYS = ['vocab-listening-words', 'vocab-listening-words-v5'];
 const DEFAULT_SETTINGS = { mode: 'random', rate: 1 };
+const GENERIC_IPA_WARNING = '音标未标注地区，尚未确认是美式音标，请核对';
 
 function createId() {
   return `word-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -13,13 +16,42 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
+function stableHash(value) {
+  let hash = 2166136261;
+  for (const character of String(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function ensureUniqueIds(words) {
+  const used = new Set();
+  return words.map((word) => {
+    let id = cleanText(word.id);
+    if (!id || used.has(id)) {
+      const base = `word-${stableHash(`${id}\u0000${word.word}`)}`;
+      id = base;
+      let suffix = 2;
+      while (used.has(id)) id = `${base}-${suffix++}`;
+    }
+    used.add(id);
+    return id === word.id ? word : { ...word, id };
+  });
+}
+
 function sanitizeSettings(value) {
   const settings = value && typeof value === 'object' ? value : {};
   const rate = Number(settings.rate);
   return {
     mode: settings.mode === 'sequential' ? 'sequential' : 'random',
-    rate: Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_SETTINGS.rate
+    rate: Number.isFinite(rate) ? clampRate(rate) : DEFAULT_SETTINGS.rate
   };
+}
+
+function sanitizeWarnings(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(cleanText).filter(Boolean))];
 }
 
 function sanitizeWord(value, now = Date.now()) {
@@ -27,16 +59,36 @@ function sanitizeWord(value, now = Date.now()) {
   const word = normalizeWord(value.word);
   if (!word) return null;
 
+  const source = cleanText(value.source) || 'manual';
+  const accent = ['us', 'generic', 'uk-only', 'missing', 'manual'].includes(value.accent)
+    ? value.accent
+    : 'manual';
+  const warnings = sanitizeWarnings(value.warnings);
+  if (accent === 'generic' && !warnings.includes(GENERIC_IPA_WARNING)) {
+    warnings.push(GENERIC_IPA_WARNING);
+  }
+  const rawAudioUrl = cleanText(value.audioUrl);
+  const knownAmericanFallback = /[?&]type=2(?:&|$)/.test(rawAudioUrl);
+  const audioAccent = value.audioAccent === 'us'
+    || knownAmericanFallback
+    || (rawAudioUrl && source === 'manual')
+    || (rawAudioUrl && source === 'freedictionaryapi' && accent !== 'generic')
+    ? 'us'
+    : '';
+
   return {
     id: cleanText(value.id) || createId(),
     word,
     phonetic: normalizePhonetic(value.phonetic),
     meaning: cleanText(value.meaning),
-    audioUrl: cleanText(value.audioUrl),
-    source: cleanText(value.source),
+    audioUrl: audioAccent === 'us' ? rawAudioUrl : '',
+    accent,
+    audioAccent,
+    source,
     confidence: ['verified', 'review', 'manual'].includes(value.confidence)
       ? value.confidence
       : 'manual',
+    warnings,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now
   };
@@ -63,7 +115,7 @@ function mergeWords(existingWords, incomingWords) {
     };
   }
 
-  return merged;
+  return ensureUniqueIds(merged);
 }
 
 function saveWordByIdentity(existingWords, incoming) {
@@ -105,8 +157,41 @@ function sanitizeState(value) {
 
   return {
     version: 1,
-    words,
+    words: ensureUniqueIds(words),
     settings: sanitizeSettings(state.settings)
+  };
+}
+
+function sanitizeLookupResult(value, key) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const word = normalizeWord(value.word);
+  const source = cleanText(value.source);
+  const confidence = value.confidence;
+  const accent = value.accent;
+  const audioAccent = value.audioAccent;
+  if (word !== key) return null;
+  if (!['freedictionaryapi', 'mymemory'].includes(source)) return null;
+  if (!['verified', 'review'].includes(confidence)) return null;
+  if (!['us', 'generic', 'uk-only', 'missing'].includes(accent)) return null;
+  if (!Array.isArray(value.warnings) || value.warnings.some((item) => typeof item !== 'string')) return null;
+
+  const meaning = cleanText(value.meaning);
+  const audioUrl = cleanText(value.audioUrl);
+  const warnings = sanitizeWarnings(value.warnings);
+  if (confidence === 'verified' && !meaning) return null;
+  if (accent === 'generic' && !warnings.includes(GENERIC_IPA_WARNING)) return null;
+  if (audioUrl && audioAccent !== 'us') return null;
+
+  return {
+    word,
+    phonetic: normalizePhonetic(value.phonetic),
+    meaning,
+    audioUrl,
+    accent,
+    audioAccent: audioUrl ? 'us' : '',
+    source,
+    confidence,
+    warnings
   };
 }
 
@@ -199,16 +284,25 @@ function createStorage(wxStorage) {
     const key = normalizeWord(word);
     const cache = wxStorage.getStorageSync(CACHE_KEY);
     if (!key || !cache || typeof cache !== 'object' || Array.isArray(cache)) return null;
-    return cache[key] || null;
+    if (cache.version !== CACHE_VERSION || !cache.entries || typeof cache.entries !== 'object') return null;
+    return sanitizeLookupResult(cache.entries[key], key);
   }
 
   function writeLookupCache(word, result) {
     const key = normalizeWord(word);
     if (!key) throw new Error('请输入有效单词');
+    const entry = sanitizeLookupResult(result, key);
+    if (!entry) throw new Error('查询缓存数据无效');
     const stored = wxStorage.getStorageSync(CACHE_KEY);
-    const cache = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
-    wxStorage.setStorageSync(CACHE_KEY, { ...cache, [key]: result });
-    return result;
+    const entries = stored && stored.version === CACHE_VERSION
+      && stored.entries && typeof stored.entries === 'object' && !Array.isArray(stored.entries)
+      ? stored.entries
+      : {};
+    wxStorage.setStorageSync(CACHE_KEY, {
+      version: CACHE_VERSION,
+      entries: { ...entries, [key]: entry }
+    });
+    return entry;
   }
 
   return {

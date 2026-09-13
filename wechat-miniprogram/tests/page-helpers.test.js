@@ -72,6 +72,45 @@ test('updates only an allowed draft field without mutating the old draft', () =>
   assert.equal(updateDraftField(original, 'id', 'changed'), original);
 });
 
+test('editing a lookup phonetic invalidates verified provenance', () => {
+  const original = {
+    ...blankDraft(),
+    word: 'tool',
+    phonetic: '/tul/',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    accent: 'us'
+  };
+
+  const updated = updateDraftField(original, 'phonetic', '/tuːl/');
+
+  assert.equal(updated.phonetic, '/tuːl/');
+  assert.equal(updated.source, 'manual');
+  assert.equal(updated.confidence, 'manual');
+  assert.equal(updated.accent, 'manual');
+});
+
+test('editing a lookup meaning becomes manual while retaining generic IPA warning', () => {
+  const warning = '音标未标注地区，尚未确认是美式音标，请核对';
+  const original = {
+    ...blankDraft(),
+    word: 'tool',
+    phonetic: '/tul/',
+    meaning: '工具',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    accent: 'generic',
+    warnings: [warning]
+  };
+
+  const updated = updateDraftField(original, 'meaning', '工具；用具');
+
+  assert.equal(updated.source, 'manual');
+  assert.equal(updated.confidence, 'manual');
+  assert.equal(updated.accent, 'generic');
+  assert.deepEqual(updated.warnings, [warning]);
+});
+
 test('filters words case-insensitively by word, phonetic, or meaning', () => {
   const words = [
     { id: '1', word: 'Tool', phonetic: '/tuːl/', meaning: '工具' },

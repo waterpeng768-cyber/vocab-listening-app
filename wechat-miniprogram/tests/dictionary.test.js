@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { collectCandidates, parseDictionaryPayload, lookupWord } = require('../services/dictionary');
+const {
+  collectCandidates,
+  createCachedLookup,
+  parseDictionaryPayload,
+  lookupWord
+} = require('../services/dictionary');
 
 test('parses tool with US IPA and Chinese dictionary meaning', () => {
   const payload = {
@@ -16,6 +21,8 @@ test('parses tool with US IPA and Chinese dictionary meaning', () => {
   assert.equal(result.phonetic, '/tul/');
   assert.match(result.meaning, /工具/);
   assert.equal(result.audioUrl, 'https://audio.example/tool-us.mp3');
+  assert.equal(result.accent, 'us');
+  assert.equal(result.audioAccent, 'us');
   assert.equal(result.confidence, 'verified');
 });
 
@@ -51,7 +58,8 @@ test('does not bind UK audio to an American lookup result', () => {
   assert.notEqual(result.audioUrl, 'https://audio.example/tool-uk.mp3');
   assert.match(result.audioUrl, /type=2/);
   assert.deepEqual(Object.keys(result), [
-    'word', 'phonetic', 'meaning', 'audioUrl', 'source', 'confidence', 'warnings'
+    'word', 'phonetic', 'meaning', 'audioUrl', 'accent', 'audioAccent',
+    'source', 'confidence', 'warnings'
   ]);
 });
 
@@ -72,6 +80,8 @@ test('keeps generic IPA but does not use its audio as American', () => {
   }, 'tool');
 
   assert.equal(result.phonetic, '/tul/');
+  assert.equal(result.accent, 'generic');
+  assert.equal(result.audioAccent, 'us');
   assert.notEqual(result.audioUrl, 'https://audio.example/tool-generic.mp3');
   assert.match(result.audioUrl, /type=2/);
   assert.match(result.warnings.join(' '), /未标注地区.*核对/);
@@ -94,4 +104,34 @@ test('returns verified dictionary meaning without calling machine translation', 
   assert.equal(result.confidence, 'verified');
   assert.equal(urls.length, 1);
   assert.match(urls[0], /freedictionaryapi/);
+});
+
+test('cached lookup returns a cache hit without calling the provider', async () => {
+  const cached = {
+    word: 'tool', phonetic: '/tul/', meaning: '工具', source: 'freedictionaryapi',
+    confidence: 'verified', accent: 'us', audioAccent: 'us', warnings: []
+  };
+  const storage = {
+    readLookupCache: () => cached,
+    writeLookupCache: () => assert.fail('cache hits must not be rewritten')
+  };
+  const lookup = createCachedLookup(storage, async () => assert.fail('provider must not run'));
+
+  assert.deepEqual(await lookup(' Tool '), cached);
+});
+
+test('cached lookup writes a provider result after a cache miss', async () => {
+  const writes = [];
+  const fresh = {
+    word: 'tool', phonetic: '/tul/', meaning: '工具', source: 'freedictionaryapi',
+    confidence: 'verified', accent: 'us', audioAccent: 'us', warnings: []
+  };
+  const storage = {
+    readLookupCache: () => null,
+    writeLookupCache: (word, result) => writes.push({ word, result })
+  };
+  const lookup = createCachedLookup(storage, async () => fresh);
+
+  assert.deepEqual(await lookup('tool'), fresh);
+  assert.deepEqual(writes, [{ word: 'tool', result: fresh }]);
 });

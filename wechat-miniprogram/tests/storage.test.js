@@ -184,6 +184,23 @@ test('recovers legacy words when non-empty current rows are all corrupt', () => 
   assert.equal(state.words[0].phonetic, '/rɪˈfrɛʃ/');
 });
 
+test('treats an authoritative empty current array as newer than legacy words', () => {
+  const memory = memoryStorage({
+    'vocab-listening-state-v1': {
+      version: 1,
+      words: [],
+      settings: { mode: 'sequential', rate: 0.8 }
+    },
+    'vocab-listening-words-v5': [{ word: 'Legacy', meaning: '旧数据' }]
+  });
+
+  const state = createStorage(memory).loadState();
+
+  assert.deepEqual(state.words, []);
+  assert.deepEqual(state.settings, { mode: 'sequential', rate: 0.8 });
+  assert.equal(memory.writes.length, 0);
+});
+
 test('accepts the version 5 web backup and merges without replacing local words', () => {
   const service = createStorage(memoryStorage());
   const original = service.saveWord({ word: 'tool', meaning: '工具' });
@@ -220,12 +237,126 @@ test('persists deletion and settings while exporting a versioned backup', () => 
   assert.deepEqual(backup.words.map((item) => item.word), ['refresh']);
 });
 
-test('reads and writes lookup cache by normalized word', () => {
+test('repairs duplicate imported ids deterministically and deletes only one row', () => {
+  const memory = memoryStorage();
+  const service = createStorage(memory);
+  const imported = service.importBackup(JSON.stringify({
+    words: [
+      { id: 'shared-id', word: 'tool', meaning: '工具' },
+      { id: 'shared-id', word: 'refresh', meaning: '刷新' }
+    ]
+  }));
+
+  assert.equal(imported.length, 2);
+  assert.equal(new Set(imported.map((word) => word.id)).size, 2);
+  const repairedId = imported.find((word) => word.word === 'refresh').id;
+  assert.notEqual(repairedId, 'shared-id');
+  assert.equal(service.loadState().words.find((word) => word.word === 'refresh').id, repairedId);
+
+  assert.equal(service.deleteWord('shared-id'), true);
+  assert.deepEqual(service.loadState().words.map((word) => word.word), ['refresh']);
+  assert.equal(service.loadState().words[0].id, repairedId);
+});
+
+test('repairs duplicate ids on load without discarding valid rows', () => {
+  const memory = memoryStorage({
+    'vocab-listening-state-v1': {
+      version: 1,
+      words: [
+        { id: 'duplicate', word: 'tool', meaning: '工具' },
+        { id: 'duplicate', word: 'refresh', meaning: '刷新' }
+      ],
+      settings: { mode: 'random', rate: 1 }
+    }
+  });
+  const service = createStorage(memory);
+
+  const first = service.loadState();
+  const second = service.loadState();
+
+  assert.deepEqual(first.words.map((word) => word.word), ['tool', 'refresh']);
+  assert.equal(new Set(first.words.map((word) => word.id)).size, 2);
+  assert.deepEqual(second.words.map((word) => word.id), first.words.map((word) => word.id));
+});
+
+test('persists generic IPA provenance and warning through save reload and edit', () => {
   const service = createStorage(memoryStorage());
-  const result = { word: 'tool', phonetic: '/tul/', meaning: '工具' };
+  const warning = '音标未标注地区，尚未确认是美式音标，请核对';
+  const saved = service.saveWord({
+    word: 'tool',
+    phonetic: '/tul/',
+    meaning: '工具',
+    audioUrl: 'https://dict.youdao.com/dictvoice?type=2&audio=tool',
+    accent: 'generic',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    warnings: [warning]
+  });
+
+  assert.equal(service.loadState().words[0].accent, 'generic');
+  assert.deepEqual(service.loadState().words[0].warnings, [warning]);
+
+  service.saveWord({ ...saved, meaning: '工具；用具' });
+  const edited = service.loadState().words[0];
+  assert.equal(edited.accent, 'generic');
+  assert.deepEqual(edited.warnings, [warning]);
+});
+
+test('does not revive unlabeled generic candidate audio as American', () => {
+  const service = createStorage(memoryStorage());
+  service.saveWord({
+    word: 'tool',
+    phonetic: '/tul/',
+    meaning: '工具',
+    audioUrl: 'https://audio.example/tool-generic.mp3',
+    accent: 'generic',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    warnings: ['音标未标注地区，尚未确认是美式音标，请核对']
+  });
+
+  const saved = service.loadState().words[0];
+  assert.equal(saved.audioUrl, '');
+  assert.equal(saved.audioAccent, '');
+});
+
+test('clamps stored playback rates to supported choices', () => {
+  const service = createStorage(memoryStorage({
+    'vocab-listening-state-v1': {
+      version: 1,
+      words: [],
+      settings: { mode: 'random', rate: 0.7 }
+    }
+  }));
+
+  assert.equal(service.loadState().settings.rate, 0.6);
+  assert.equal(service.saveSettings({ rate: 9 }).rate, 1.2);
+  assert.equal(service.saveSettings({ rate: -1 }).rate, 0.6);
+});
+
+test('reads and writes only current valid versioned lookup cache entries', () => {
+  const memory = memoryStorage();
+  const service = createStorage(memory);
+  const result = {
+    word: 'tool', phonetic: '/tul/', meaning: '工具', audioUrl: 'https://audio.example/tool-us.mp3',
+    source: 'freedictionaryapi', confidence: 'verified', accent: 'us', audioAccent: 'us', warnings: []
+  };
 
   service.writeLookupCache(' Tool ', result);
 
   assert.deepEqual(service.readLookupCache('tool'), result);
   assert.equal(service.readLookupCache('missing'), null);
+  assert.equal(memory.values['vocab-listening-lookup-cache-v1'].version, 1);
+
+  memory.values['vocab-listening-lookup-cache-v1'] = {
+    version: 0,
+    entries: { tool: result }
+  };
+  assert.equal(service.readLookupCache('tool'), null);
+
+  memory.values['vocab-listening-lookup-cache-v1'] = {
+    version: 1,
+    entries: { tool: { ...result, warnings: 'not-an-array' } }
+  };
+  assert.equal(service.readLookupCache('tool'), null);
 });
