@@ -6,6 +6,7 @@ const {
   parseDictionaryPayload,
   lookupWord
 } = require('../services/dictionary');
+const { createStorage } = require('../utils/storage');
 
 test('parses tool with US IPA and Chinese dictionary meaning', () => {
   const payload = {
@@ -134,4 +135,55 @@ test('cached lookup writes a provider result after a cache miss', async () => {
 
   assert.deepEqual(await lookup('tool'), fresh);
   assert.deepEqual(writes, [{ word: 'tool', result: fresh }]);
+});
+
+test('cached lookup rejects fake generic US audio and falls back to the provider', async () => {
+  const warning = '音标未标注地区，尚未确认是美式音标，请核对';
+  const values = {
+    'vocab-listening-lookup-cache-v1': {
+      version: 1,
+      entries: {
+        tool: {
+          word: 'tool',
+          phonetic: '/tul/',
+          meaning: '工具',
+          audioUrl: 'https://audio.example/unlabelled-candidate.mp3',
+          accent: 'generic',
+          audioAccent: 'us',
+          source: 'freedictionaryapi',
+          confidence: 'verified',
+          warnings: [warning]
+        }
+      }
+    }
+  };
+  const storage = createStorage({
+    getStorageSync: (key) => values[key],
+    setStorageSync: (key, value) => { values[key] = value; }
+  });
+  let providerCalls = 0;
+  const fallback = {
+    word: 'tool',
+    phonetic: '/tul/',
+    meaning: '工具',
+    audioUrl: 'https://dict.youdao.com/dictvoice?type=2&audio=tool',
+    accent: 'generic',
+    audioAccent: 'us',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    warnings: [warning]
+  };
+  const lookup = createCachedLookup(storage, async () => {
+    providerCalls += 1;
+    return fallback;
+  });
+
+  assert.deepEqual(await lookup('tool'), fallback);
+  assert.equal(providerCalls, 1);
+  assert.equal(
+    values['vocab-listening-lookup-cache-v1'].entries.tool.audioUrl,
+    fallback.audioUrl
+  );
+  assert.deepEqual(await lookup('tool'), fallback);
+  assert.equal(providerCalls, 1);
 });

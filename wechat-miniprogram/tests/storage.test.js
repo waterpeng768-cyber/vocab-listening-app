@@ -295,6 +295,11 @@ test('persists generic IPA provenance and warning through save reload and edit',
 
   assert.equal(service.loadState().words[0].accent, 'generic');
   assert.deepEqual(service.loadState().words[0].warnings, [warning]);
+  assert.equal(
+    service.loadState().words[0].audioUrl,
+    'https://dict.youdao.com/dictvoice?type=2&audio=tool'
+  );
+  assert.equal(service.loadState().words[0].audioAccent, 'us');
 
   service.saveWord({ ...saved, meaning: '工具；用具' });
   const edited = service.loadState().words[0];
@@ -310,6 +315,25 @@ test('does not revive unlabeled generic candidate audio as American', () => {
     meaning: '工具',
     audioUrl: 'https://audio.example/tool-generic.mp3',
     accent: 'generic',
+    source: 'freedictionaryapi',
+    confidence: 'verified',
+    warnings: ['音标未标注地区，尚未确认是美式音标，请核对']
+  });
+
+  const saved = service.loadState().words[0];
+  assert.equal(saved.audioUrl, '');
+  assert.equal(saved.audioAccent, '');
+});
+
+test('strips arbitrary generic audio even when the caller claims it is American', () => {
+  const service = createStorage(memoryStorage());
+  service.saveWord({
+    word: 'tool',
+    phonetic: '/tul/',
+    meaning: '工具',
+    audioUrl: 'https://audio.example/unlabelled-candidate.mp3',
+    accent: 'generic',
+    audioAccent: 'us',
     source: 'freedictionaryapi',
     confidence: 'verified',
     warnings: ['音标未标注地区，尚未确认是美式音标，请核对']

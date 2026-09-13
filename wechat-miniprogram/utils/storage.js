@@ -1,5 +1,6 @@
 const { normalizeWord, normalizePhonetic } = require('./phonetics');
 const { clampRate } = require('./review');
+const { americanTtsUrl } = require('../config/services');
 
 const STATE_KEY = 'vocab-listening-state-v1';
 const CACHE_KEY = 'vocab-listening-lookup-cache-v1';
@@ -54,6 +55,10 @@ function sanitizeWarnings(value) {
   return [...new Set(value.map(cleanText).filter(Boolean))];
 }
 
+function isKnownAmericanFallback(url, word) {
+  return Boolean(word) && url === americanTtsUrl(word);
+}
+
 function sanitizeWord(value, now = Date.now()) {
   if (!value || typeof value !== 'object') return null;
   const word = normalizeWord(value.word);
@@ -68,13 +73,14 @@ function sanitizeWord(value, now = Date.now()) {
     warnings.push(GENERIC_IPA_WARNING);
   }
   const rawAudioUrl = cleanText(value.audioUrl);
-  const knownAmericanFallback = /[?&]type=2(?:&|$)/.test(rawAudioUrl);
-  const audioAccent = value.audioAccent === 'us'
-    || knownAmericanFallback
-    || (rawAudioUrl && source === 'manual')
-    || (rawAudioUrl && source === 'freedictionaryapi' && accent !== 'generic')
-    ? 'us'
-    : '';
+  const knownAmericanFallback = isKnownAmericanFallback(rawAudioUrl, word);
+  const audioIsAmerican = rawAudioUrl && (accent === 'generic'
+    ? knownAmericanFallback
+    : value.audioAccent === 'us'
+      || knownAmericanFallback
+      || source === 'manual'
+      || source === 'freedictionaryapi');
+  const audioAccent = audioIsAmerican ? 'us' : '';
 
   return {
     id: cleanText(value.id) || createId(),
@@ -180,7 +186,8 @@ function sanitizeLookupResult(value, key) {
   const warnings = sanitizeWarnings(value.warnings);
   if (confidence === 'verified' && !meaning) return null;
   if (accent === 'generic' && !warnings.includes(GENERIC_IPA_WARNING)) return null;
-  if (audioUrl && audioAccent !== 'us') return null;
+  if (audioUrl && accent === 'generic' && !isKnownAmericanFallback(audioUrl, word)) return null;
+  if (audioUrl && accent !== 'generic' && audioAccent !== 'us') return null;
 
   return {
     word,
