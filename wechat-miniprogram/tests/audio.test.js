@@ -19,8 +19,22 @@ function createFakeAudioWx() {
     emitEnded() { this.ended(); },
     emitError() { this.failed(); }
   };
-  return { context, createInnerAudioContext: () => context };
+  return {
+    context,
+    innerAudioOptions: null,
+    createInnerAudioContext: () => context,
+    setInnerAudioOption(options) { this.innerAudioOptions = options; }
+  };
 }
+
+test('plays pronunciation through the iPhone silent switch', () => {
+  const fakeWx = createFakeAudioWx();
+  const player = createAudioPlayer(fakeWx);
+
+  assert.deepEqual(fakeWx.innerAudioOptions, { obeyMuteSwitch: false });
+  assert.equal(fakeWx.context.obeyMuteSwitch, false);
+  player.destroy();
+});
 
 test('sets playback rate and resolves after audio ends', async () => {
   const fakeWx = createFakeAudioWx();

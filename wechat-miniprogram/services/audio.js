@@ -1,5 +1,9 @@
 function createAudioPlayer(wxApi) {
+  if (typeof wxApi.setInnerAudioOption === 'function') {
+    wxApi.setInnerAudioOption({ obeyMuteSwitch: false });
+  }
   const context = wxApi.createInnerAudioContext();
+  context.obeyMuteSwitch = false;
   let activePlayback = null;
 
   function cancelActive(message) {
