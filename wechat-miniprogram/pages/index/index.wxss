@@ -85,8 +85,13 @@ button.icon-text-button {
 }
 
 button.segment {
+  width: 100%;
   min-height: 72rpx;
+  padding: 0;
   color: #52606d;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 button.segment.is-active {

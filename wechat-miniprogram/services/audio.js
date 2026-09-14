@@ -21,10 +21,9 @@ function createAudioPlayer(wxApi) {
     context.stop();
     if (!url) return Promise.reject(new Error('没有可用的美音音频'));
 
-    context.src = url;
-    context.playbackRate = rate;
-
     return new Promise((resolve, reject) => {
+      let downloadTask = null;
+      let playback = null;
       const cleanup = () => {
         context.offEnded(onEnded);
         context.offError(onError);
@@ -34,20 +33,56 @@ function createAudioPlayer(wxApi) {
         cleanup();
         resolve();
       };
-      const onError = () => {
+      const fail = (message) => {
+        if (activePlayback !== playback) return;
         activePlayback = null;
         cleanup();
-        reject(new Error('美音播放失败，请检查网络后重试'));
+        reject(new Error(message));
+      };
+      const onError = () => fail('美音播放失败，请检查网络后重试');
+      const startPlayback = (source) => {
+        if (activePlayback !== playback) return;
+        context.src = source;
+        context.playbackRate = rate;
+        try {
+          context.play();
+        } catch (_) {
+          onError();
+        }
       };
 
-      activePlayback = { cleanup, reject };
+      playback = {
+        cleanup() {
+          cleanup();
+          if (downloadTask && typeof downloadTask.abort === 'function') downloadTask.abort();
+        },
+        reject
+      };
+      activePlayback = playback;
       context.onEnded(onEnded);
       context.onError(onError);
-      try {
-        context.play();
-      } catch (_) {
-        onError();
+
+      if (typeof wxApi.downloadFile !== 'function') {
+        startPlayback(url);
+        return;
       }
+
+      downloadTask = wxApi.downloadFile({
+        url,
+        timeout: 15000,
+        success(result) {
+          const statusCode = Number(result && result.statusCode);
+          const tempFilePath = result && result.tempFilePath;
+          if (statusCode >= 200 && statusCode < 300 && tempFilePath) {
+            startPlayback(tempFilePath);
+            return;
+          }
+          fail('美音下载失败，请检查网络后重试');
+        },
+        fail() {
+          fail('美音下载失败，请确认手机已开启开发调试');
+        }
+      });
     });
   }
 

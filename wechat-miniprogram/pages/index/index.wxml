@@ -11,8 +11,8 @@
 
   <view class="content">
     <view class="segmented" role="tablist">
-      <button class="segment {{activeTab === 'review' ? 'is-active' : ''}}" data-tab="review" bindtap="switchTab">▶ 复习</button>
-      <button class="segment {{activeTab === 'library' ? 'is-active' : ''}}" data-tab="library" bindtap="switchTab">≡ 词库</button>
+      <button class="segment {{activeTab === 'review' ? 'is-active' : ''}}" data-tab="review" bindtap="switchTab">练习</button>
+      <button class="segment {{activeTab === 'library' ? 'is-active' : ''}}" data-tab="library" bindtap="switchTab">词库</button>
     </view>
 
     <view wx:if="{{activeTab === 'review'}}" class="section review-section">

@@ -27,3 +27,14 @@ test('keeps answer IPA left-to-right and provides manual lookup fallback', () =>
   assert.match(template, /查询失败[^<]*手动填写/);
   assert.match(template, /class="status-text library-playback-status"/);
 });
+
+test('keeps the practice and library tabs as stable equal-width text labels', () => {
+  const template = fs.readFileSync(path.join(pageDirectory, 'index.wxml'), 'utf8');
+  const styles = fs.readFileSync(path.join(pageDirectory, 'index.wxss'), 'utf8');
+
+  assert.match(template, />\s*练习\s*<\/button>/);
+  assert.match(template, />\s*词库\s*<\/button>/);
+  assert.doesNotMatch(template, />\s*[▶≡]\s*(练习|词库)/);
+  assert.match(styles, /button\.segment\s*\{[^}]*width:\s*100%/s);
+  assert.match(styles, /button\.segment\s*\{[^}]*white-space:\s*nowrap/s);
+});
