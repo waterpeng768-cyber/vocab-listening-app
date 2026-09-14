@@ -95,8 +95,12 @@ function sanitizeWord(value, now = Date.now()) {
       ? value.confidence
       : 'manual',
     warnings,
-    createdAt: value.createdAt ?? now,
-    updatedAt: value.updatedAt ?? now
+    createdAt: value.createdAt === null || value.createdAt === undefined
+      ? now
+      : value.createdAt,
+    updatedAt: value.updatedAt === null || value.updatedAt === undefined
+      ? now
+      : value.updatedAt
   };
 }
 
