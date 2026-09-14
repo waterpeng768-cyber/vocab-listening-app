@@ -183,7 +183,7 @@ function createController({
         const message = error && error.message ? error.message : '美音播放失败';
         publish({
           audioBusy: false,
-          audioStatus: `${message}，请重试`,
+          audioStatus: /重试/.test(message) ? message : `${message}，请重试`,
           playingWordId: null
         });
       }

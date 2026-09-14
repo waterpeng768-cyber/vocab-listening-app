@@ -57,6 +57,31 @@ test('downloads remote audio to a local temporary file before playback', async (
   assert.equal(fakeWx.context.failed, null);
 });
 
+test('adds an mp3 extension to an extensionless downloaded audio file', async () => {
+  const fakeWx = createFakeAudioWx();
+  const copies = [];
+  fakeWx.env = { USER_DATA_PATH: 'wxfile://usr' };
+  fakeWx.getFileSystemManager = () => ({
+    copyFile(options) {
+      copies.push({ srcPath: options.srcPath, destPath: options.destPath });
+      options.success();
+    }
+  });
+  fakeWx.downloadFile = (options) => {
+    options.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/no-extension' });
+  };
+  const player = createAudioPlayer(fakeWx);
+  const pending = player.play('https://audio.example/dictvoice?audio=tool');
+
+  assert.deepEqual(copies, [{
+    srcPath: 'wxfile://tmp/no-extension',
+    destPath: 'wxfile://usr/vocab-pronunciation.mp3'
+  }]);
+  assert.equal(fakeWx.context.src, 'wxfile://usr/vocab-pronunciation.mp3');
+  fakeWx.context.emitEnded();
+  await pending;
+});
+
 test('rejects with a Chinese message when URL is empty', async () => {
   const player = createAudioPlayer(createFakeAudioWx());
   await assert.rejects(() => player.play('', 1), /没有可用的美音音频/);
@@ -86,6 +111,15 @@ test('rejects playback errors and releases callbacks', async () => {
   await assert.rejects(pending, /美音播放失败，请检查网络后重试/);
   assert.equal(fakeWx.context.ended, null);
   assert.equal(fakeWx.context.failed, null);
+});
+
+test('includes the native WeChat audio error code in playback feedback', async () => {
+  const fakeWx = createFakeAudioWx();
+  const player = createAudioPlayer(fakeWx);
+  const pending = player.play('https://audio.example/tool.mp3');
+
+  fakeWx.context.failed({ errCode: 10004 });
+  await assert.rejects(pending, /错误码 10004/);
 });
 
 test('stop and destroy reuse the only audio context', () => {

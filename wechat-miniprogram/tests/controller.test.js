@@ -67,7 +67,7 @@ function fakeDependencies(options = {}) {
     audio: {
       play: async (url, rate) => {
         calls.audioPlay.push({ url, rate });
-        if (options.audioFails) throw new Error('播放失败');
+        if (options.audioFails) throw new Error(options.audioErrorMessage || '播放失败');
       },
       stop: () => { calls.audioStop += 1; },
       destroy: () => { calls.audioDestroy += 1; }
@@ -106,6 +106,19 @@ test('audio failure keeps the same word and clears busy state', async () => {
   assert.equal(controller.getState().currentWord.id, '1');
   assert.equal(controller.getState().audioBusy, false);
   assert.match(controller.getState().audioStatus, /播放失败.*重试/);
+});
+
+test('does not append a second retry phrase to an actionable audio error', async () => {
+  const { dependencies } = fakeDependencies({
+    words: [{ id: '1', word: 'tool' }],
+    audioFails: true,
+    audioErrorMessage: '美音播放失败，请检查网络后重试'
+  });
+  const controller = createController(dependencies);
+  controller.initialize();
+
+  await assert.rejects(() => controller.playCurrent());
+  assert.equal(controller.getState().audioStatus, '美音播放失败，请检查网络后重试');
 });
 
 test('maps every lookup failure and preserves a manually editable draft', async () => {

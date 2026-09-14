@@ -6,6 +6,26 @@ function createAudioPlayer(wxApi) {
   context.obeyMuteSwitch = false;
   let activePlayback = null;
 
+  function prepareAudioFile(tempFilePath, onReady, onFailure) {
+    if (/\.(mp3|m4a|aac|wav)(?:$|[?#])/i.test(tempFilePath)) {
+      onReady(tempFilePath);
+      return;
+    }
+    if (!wxApi.env || !wxApi.env.USER_DATA_PATH || typeof wxApi.getFileSystemManager !== 'function') {
+      onReady(tempFilePath);
+      return;
+    }
+
+    const destination = `${wxApi.env.USER_DATA_PATH}/vocab-pronunciation.mp3`;
+    const fileSystem = wxApi.getFileSystemManager();
+    fileSystem.copyFile({
+      srcPath: tempFilePath,
+      destPath: destination,
+      success() { onReady(destination); },
+      fail() { onFailure('音频文件准备失败，请重试'); }
+    });
+  }
+
   function cancelActive(message) {
     if (!activePlayback) return;
     const playback = activePlayback;
@@ -39,7 +59,11 @@ function createAudioPlayer(wxApi) {
         cleanup();
         reject(new Error(message));
       };
-      const onError = () => fail('美音播放失败，请检查网络后重试');
+      const onError = (detail) => {
+        const code = detail && detail.errCode;
+        const codeText = code === undefined || code === null ? '' : `（错误码 ${code}）`;
+        fail(`美音播放失败${codeText}，请检查网络后重试`);
+      };
       const startPlayback = (source) => {
         if (activePlayback !== playback) return;
         context.src = source;
@@ -74,7 +98,7 @@ function createAudioPlayer(wxApi) {
           const statusCode = Number(result && result.statusCode);
           const tempFilePath = result && result.tempFilePath;
           if (statusCode >= 200 && statusCode < 300 && tempFilePath) {
-            startPlayback(tempFilePath);
+            prepareAudioFile(tempFilePath, startPlayback, fail);
             return;
           }
           fail('美音下载失败，请检查网络后重试');
