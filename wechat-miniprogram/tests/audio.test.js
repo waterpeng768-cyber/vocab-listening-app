@@ -41,45 +41,20 @@ test('plays pronunciation through the iPhone silent switch', () => {
   player.destroy();
 });
 
-test('downloads remote audio to a local temporary file before playback', async () => {
+test('streams remote pronunciation with autoplay on iPhone', async () => {
   const fakeWx = createFakeAudioWx();
   const player = createAudioPlayer(fakeWx);
   const pending = player.play('https://audio.example/tool.mp3', 0.8);
 
-  assert.deepEqual(fakeWx.downloadCalls, ['https://audio.example/tool.mp3']);
-  assert.equal(fakeWx.context.src, 'wxfile://tmp/pronunciation.mp3');
+  assert.deepEqual(fakeWx.downloadCalls, []);
+  assert.equal(fakeWx.context.autoplay, true);
+  assert.equal(fakeWx.context.src, 'https://audio.example/tool.mp3');
   assert.equal(fakeWx.context.playbackRate, 0.8);
   assert.equal(fakeWx.context.stopCalls, 1);
-  assert.equal(fakeWx.context.playCalls, 1);
   fakeWx.context.emitEnded();
   await pending;
   assert.equal(fakeWx.context.ended, null);
   assert.equal(fakeWx.context.failed, null);
-});
-
-test('adds an mp3 extension to an extensionless downloaded audio file', async () => {
-  const fakeWx = createFakeAudioWx();
-  const copies = [];
-  fakeWx.env = { USER_DATA_PATH: 'wxfile://usr' };
-  fakeWx.getFileSystemManager = () => ({
-    copyFile(options) {
-      copies.push({ srcPath: options.srcPath, destPath: options.destPath });
-      options.success();
-    }
-  });
-  fakeWx.downloadFile = (options) => {
-    options.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/no-extension' });
-  };
-  const player = createAudioPlayer(fakeWx);
-  const pending = player.play('https://audio.example/dictvoice?audio=tool');
-
-  assert.deepEqual(copies, [{
-    srcPath: 'wxfile://tmp/no-extension',
-    destPath: 'wxfile://usr/vocab-pronunciation.mp3'
-  }]);
-  assert.equal(fakeWx.context.src, 'wxfile://usr/vocab-pronunciation.mp3');
-  fakeWx.context.emitEnded();
-  await pending;
 });
 
 test('rejects with a Chinese message when URL is empty', async () => {
@@ -122,6 +97,15 @@ test('includes the native WeChat audio error code in playback feedback', async (
   await assert.rejects(pending, /错误码 10004/);
 });
 
+test('includes the native WeChat audio error message for unknown failures', async () => {
+  const fakeWx = createFakeAudioWx();
+  const player = createAudioPlayer(fakeWx);
+  const pending = player.play('https://audio.example/tool.mp3');
+
+  fakeWx.context.failed({ errCode: -1, errMsg: 'set audio src fail' });
+  await assert.rejects(pending, /set audio src fail/);
+});
+
 test('stop and destroy reuse the only audio context', () => {
   const fakeWx = createFakeAudioWx();
   const player = createAudioPlayer(fakeWx);
@@ -141,31 +125,8 @@ test('starting another playback rejects and cleans up the previous one', async (
   const second = player.play('https://audio.example/second.mp3', 1.2);
 
   await assert.rejects(first, /已切换到新的单词/);
-  assert.equal(fakeWx.context.src, 'wxfile://tmp/pronunciation.mp3');
+  assert.equal(fakeWx.context.src, 'https://audio.example/second.mp3');
   assert.equal(fakeWx.context.playbackRate, 1.2);
-  fakeWx.context.emitEnded();
-  await second;
-});
-
-test('ignores a late download callback from cancelled playback', async () => {
-  const fakeWx = createFakeAudioWx();
-  const downloads = [];
-  fakeWx.downloadFile = (options) => {
-    downloads.push(options);
-    return { abort() {} };
-  };
-  const player = createAudioPlayer(fakeWx);
-
-  const first = player.play('https://audio.example/first.mp3');
-  const second = player.play('https://audio.example/second.mp3');
-  await assert.rejects(first, /已切换到新的单词/);
-
-  downloads[0].success({ statusCode: 200, tempFilePath: 'wxfile://tmp/first.mp3' });
-  assert.equal(fakeWx.context.playCalls, 0);
-
-  downloads[1].success({ statusCode: 200, tempFilePath: 'wxfile://tmp/second.mp3' });
-  assert.equal(fakeWx.context.src, 'wxfile://tmp/second.mp3');
-  assert.equal(fakeWx.context.playCalls, 1);
   fakeWx.context.emitEnded();
   await second;
 });

@@ -6,26 +6,6 @@ function createAudioPlayer(wxApi) {
   context.obeyMuteSwitch = false;
   let activePlayback = null;
 
-  function prepareAudioFile(tempFilePath, onReady, onFailure) {
-    if (/\.(mp3|m4a|aac|wav)(?:$|[?#])/i.test(tempFilePath)) {
-      onReady(tempFilePath);
-      return;
-    }
-    if (!wxApi.env || !wxApi.env.USER_DATA_PATH || typeof wxApi.getFileSystemManager !== 'function') {
-      onReady(tempFilePath);
-      return;
-    }
-
-    const destination = `${wxApi.env.USER_DATA_PATH}/vocab-pronunciation.mp3`;
-    const fileSystem = wxApi.getFileSystemManager();
-    fileSystem.copyFile({
-      srcPath: tempFilePath,
-      destPath: destination,
-      success() { onReady(destination); },
-      fail() { onFailure('音频文件准备失败，请重试'); }
-    });
-  }
-
   function cancelActive(message) {
     if (!activePlayback) return;
     const playback = activePlayback;
@@ -42,7 +22,6 @@ function createAudioPlayer(wxApi) {
     if (!url) return Promise.reject(new Error('没有可用的美音音频'));
 
     return new Promise((resolve, reject) => {
-      let downloadTask = null;
       let playback = null;
       const cleanup = () => {
         context.offEnded(onEnded);
@@ -62,51 +41,24 @@ function createAudioPlayer(wxApi) {
       const onError = (detail) => {
         const code = detail && detail.errCode;
         const codeText = code === undefined || code === null ? '' : `（错误码 ${code}）`;
-        fail(`美音播放失败${codeText}，请检查网络后重试`);
-      };
-      const startPlayback = (source) => {
-        if (activePlayback !== playback) return;
-        context.src = source;
-        context.playbackRate = rate;
-        try {
-          context.play();
-        } catch (_) {
-          onError();
-        }
+        const nativeMessage = detail && detail.errMsg
+          ? String(detail.errMsg).trim().slice(0, 100)
+          : '';
+        const nativeText = nativeMessage ? `：${nativeMessage}` : '';
+        fail(`美音播放失败${codeText}${nativeText}，请检查网络后重试`);
       };
 
       playback = {
-        cleanup() {
-          cleanup();
-          if (downloadTask && typeof downloadTask.abort === 'function') downloadTask.abort();
-        },
+        cleanup,
         reject
       };
       activePlayback = playback;
       context.onEnded(onEnded);
       context.onError(onError);
-
-      if (typeof wxApi.downloadFile !== 'function') {
-        startPlayback(url);
-        return;
-      }
-
-      downloadTask = wxApi.downloadFile({
-        url,
-        timeout: 15000,
-        success(result) {
-          const statusCode = Number(result && result.statusCode);
-          const tempFilePath = result && result.tempFilePath;
-          if (statusCode >= 200 && statusCode < 300 && tempFilePath) {
-            prepareAudioFile(tempFilePath, startPlayback, fail);
-            return;
-          }
-          fail('美音下载失败，请检查网络后重试');
-        },
-        fail() {
-          fail('美音下载失败，请确认手机已开启开发调试');
-        }
-      });
+      context.autoplay = true;
+      context.playbackRate = rate;
+      context.volume = 1;
+      context.src = url;
     });
   }
 
